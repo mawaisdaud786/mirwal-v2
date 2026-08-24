@@ -1,0 +1,310 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap');
+
+:root {
+  /* =========================================
+     BRAND COLORS
+     ========================================= */
+
+  --color-primary: #ff641b;
+  --color-primary-dark: #ed5310;
+  --color-primary-light: #fff1e6;
+  --color-primary-lighter: #fff7ef;
+
+  --color-background: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-soft: #fff8f2;
+  --color-surface-lightest: #fffaf6;
+
+  --color-text: #181818;
+  --color-text-secondary: #686868;
+  --color-text-muted: #888888;
+  --color-text-light: #555555;
+  --color-text-lighter: #666666;
+
+  --color-border: #f1e7df;
+  --color-border-light: #f5eee9;
+  --color-border-lighter: #f3e5dc;
+  --color-border-lightest: #f4e8df;
+
+  --color-success: #359354;
+  --color-success-light: #effbf1;
+  --color-success-dark: #32894e;
+
+  --color-danger: #e33d2f;
+  --color-danger-dark: #c83228;
+  --color-danger-light: #e9b58f;
+
+  --color-info: #6847c7;
+  --color-info-light: #f8f6ff;
+  --color-info-lighter: #ece8f8;
+  --color-info-bg: #fcfbff;
+
+  --color-accent: #f39a00;
+  --color-focus: #222222;
+
+  /* Legacy aliases for backward compatibility */
+  --orange: var(--color-primary);
+  --ink: var(--color-text);
+  --muted: var(--color-text-secondary);
+  --line: var(--color-border);
+  --cream: var(--color-surface-soft);
+  --mirwal-peach: var(--color-primary-light);
+
+
+  /* =========================================
+     TYPOGRAPHY
+     ========================================= */
+
+  --font-body: "DM Sans", sans-serif;
+  --font-heading: "Manrope", sans-serif;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+
+  --font-size-xs: 8px;
+  --font-size-sm: 9px;
+  --font-size-md: 10px;
+  --font-size-base: 11px;
+  --font-size-lg: 12px;
+  --font-size-xl: 13px;
+  --font-size-2xl: 14px;
+  --font-size-3xl: 15px;
+  --font-size-4xl: 16px;
+  --font-size-5xl: 17px;
+  --font-size-6xl: 18px;
+  --font-size-7xl: 20px;
+  --font-size-8xl: 21px;
+  --font-size-9xl: 22px;
+  --font-size-10xl: 23px;
+  --font-size-11xl: 25px;
+  --font-size-12xl: 26px;
+  --font-size-13xl: 28px;
+  --font-size-14xl: 30px;
+  --font-size-display-sm: 33px;
+  --font-size-display-md: 40px;
+  --font-size-display-lg: 41px;
+  --font-size-display-hero: 48px;
+
+  --line-height-tight: 1;
+  --line-height-snug: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.6;
+  --line-height-loose: 1.7;
+
+
+  /* =========================================
+     SEMANTIC TYPOGRAPHY
+     ========================================= */
+
+  --text-caption: var(--font-size-xs);
+  --text-tiny: var(--font-size-sm);
+  --text-small: var(--font-size-md);
+  --text-body: var(--font-size-2xl);
+  --text-muted: var(--font-size-lg);
+  --text-label: var(--font-size-base);
+
+  --heading-xs: var(--font-size-base);
+  --heading-sm: var(--font-size-2xl);
+  --heading-md: var(--font-size-7xl);
+  --heading-lg: var(--font-size-8xl);
+  --heading-xl: var(--font-size-display-lg);
+
+
+  /* =========================================
+     SPACING
+     ========================================= */
+
+  --space-1: 4px;
+  --space-2: 5px;
+  --space-3: 6px;
+  --space-4: 7px;
+  --space-5: 8px;
+  --space-6: 9px;
+  --space-7: 10px;
+  --space-8: 12px;
+  --space-9: 14px;
+  --space-10: 15px;
+  --space-11: 16px;
+  --space-12: 18px;
+  --space-13: 20px;
+  --space-14: 22px;
+  --space-15: 24px;
+  --space-16: 25px;
+  --space-17: 26px;
+  --space-18: 28px;
+  --space-19: 30px;
+  --space-20: 32px;
+  --space-21: 35px;
+  --space-22: 36px;
+  --space-23: 40px;
+  --space-24: 42px;
+  --space-25: 45px;
+  --space-26: 48px;
+  --space-27: 64px;
+
+
+  /* =========================================
+     BORDER RADIUS
+     ========================================= */
+
+  --radius-xs: 4px;
+  --radius-sm: 5px;
+  --radius-md: 6px;
+  --radius-lg: 7px;
+  --radius-xl: 8px;
+  --radius-2xl: 9px;
+  --radius-3xl: 10px;
+  --radius-4xl: 12px;
+  --radius-5xl: 14px;
+  --radius-pill: 999px;
+
+  /* Semantic radius */
+  --radius-card: 10px;
+  --radius-button: 5px;
+  --radius-input: 5px;
+
+
+  /* =========================================
+     BORDERS
+     ========================================= */
+
+  --border-width: 1px;
+  --border-color: var(--color-border);
+
+
+  /* =========================================
+     SHADOWS
+     ========================================= */
+
+  --shadow-xs: 0 2px 4px rgba(0, 0, 0, 0.08);
+  --shadow-sm: 0 3px 12px #8d542533;
+  --shadow-soft: 0 4px 14px #65508a18;
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.1);
+  --shadow-hover: 0 6px 16px #dfbba42b;
+  --shadow-lg: 0 6px 18px #65508a18;
+  --shadow-xl: 0 8px 25px #20202044;
+  --shadow-2xl: 0 9px 28px #6c54a014;
+
+
+  /* =========================================
+     LAYOUT & CONTAINER
+     ========================================= */
+
+  --container-desktop: 1200px;
+  --container-desktop-alt: 1160px;
+  --container-max: 1150px;
+  --container-padding: 20px;
+  --container-padding-sm: 14px;
+  --container-padding-mobile: 24px;
+
+  --header-height: 76px;
+  --header-height-desktop: 82px;
+  --nav-height: 51px;
+  --nav-height-desktop: 56px;
+  --utility-height: 36px;
+
+
+  /* =========================================
+     COMPONENT DIMENSIONS
+     ========================================= */
+
+  --button-height: 42px;
+  --button-height-sm: 37px;
+  --button-height-xs: 34px;
+  --button-padding-x: 16px;
+  --button-padding-y: 10px;
+
+  --input-height: 40px;
+  --input-height-sm: 36px;
+  --input-height-xs: 32px;
+
+  --card-padding: 16px;
+  --card-radius: var(--radius-card);
+
+  --product-card-height: 270px;
+  --product-card-height-desktop: 360px;
+  --product-card-height-mobile: 235px;
+
+  --product-image-height: 115px;
+  --product-image-height-desktop: 145px;
+  --product-image-height-mobile: 75px;
+
+  --avatar-size: 35px;
+  --avatar-size-sm: 32px;
+
+  --badge-padding: 4px 5px;
+  --badge-padding-sm: 4px 7px;
+  --badge-radius: 4px;
+
+
+  /* =========================================
+     TRANSITIONS & ANIMATIONS
+     ========================================= */
+
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.2s ease;
+  --transition-medium: 0.22s ease;
+  --transition-slow: 0.25s ease;
+  --transition-slower: 0.45s ease;
+  --transition-slowest: 0.55s ease;
+
+  --animation-duration: 0.6s;
+  --animation-easing: ease-out;
+
+
+  /* =========================================
+     BREAKPOINTS
+     ========================================= */
+
+  --breakpoint-mobile-sm: 480px;
+  --breakpoint-mobile: 600px;
+  --breakpoint-tablet: 800px;
+  --breakpoint-tablet-lg: 1100px;
+  --breakpoint-desktop: 1024px;
+  --breakpoint-wide: 1200px;
+
+
+  /* =========================================
+     Z-INDEX LAYERS
+     ========================================= */
+
+  --z-hide: -1;
+  --z-base: 0;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-header: 300;
+  --z-modal: 1000;
+  --z-toast: 1100;
+}
+
+* { box-sizing: border-box; }
+html { font-size: 16px; }
+body {
+  margin: 0;
+  color: var(--color-text);
+  background: var(--color-background);
+  font-family: var(--font-body);
+  font-size: var(--text-body);
+  line-height: var(--line-height-normal);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; text-decoration: none; }
+button, input, textarea, select { font: inherit; }
+button { cursor: pointer; }
+
+.mirwal-container { width: min(var(--container-desktop), calc(100% - 40px)); margin: 0 auto; }
+.mirwal-section { margin-top: 30px; }
+.mirwal-heading { margin: 0 0 var(--space-11); font: var(--font-weight-bold) var(--font-size-7xl)/var(--line-height-snug) var(--font-heading); }
+.mirwal-copy { color: var(--color-text-secondary); font-size: var(--text-body); line-height: var(--line-height-relaxed); }
+.mirwal-button { border: 0; border-radius: var(--radius-button); padding: var(--button-padding-y) var(--button-padding-x); background: var(--color-primary); color: #fff; font-size: var(--text-body); font-weight: var(--font-weight-bold); }
+.mirwal-button:hover { background: var(--color-primary-dark); }
+
+@media (max-width: 800px) {
+  .mirwal-container { width: calc(100% - 28px); }
+  .mirwal-section { margin-top: 24px; }
+}
