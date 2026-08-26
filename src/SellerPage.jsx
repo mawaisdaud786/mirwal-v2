@@ -1,13 +1,13 @@
-import { useState } from 'react'
 import Header from './components/Header'
 import Footer from './components/Footer'
 import sellerHero from './assets/images/sel with mirwal hero.png'
 import sellerRocket from './assets/images/sell with mirwal rocket.png'
 import sellerShop from './assets/images/sell with tmirwal shop.png'
 import './seller-pages.css'
+import { navigateTo } from './navigation'
 
 const FaIcon = ({ name }) => <i className={`fa-solid fa-${name}`} aria-hidden="true" />
-function navigate(path) { window.history.pushState({}, '', path); window.dispatchEvent(new PopStateEvent('popstate')) }
+function navigate(path) { navigateTo(path) }
 
 const benefits = [['users', 'Millions of Customers', 'Access a huge and growing customer base.'], ['percent', 'Low Commission', 'Competitive rates with no hidden charges.'], ['shield-halved', 'Secure & Reliable', 'Safe payments and anti-fraud protection.'], ['headset', 'Seller Support', 'Dedicated support to help you grow.']]
 const steps = [['user-plus', 'Create Account', 'Sign up and submit your basic store information.'], ['store', 'Set Up Your Store', 'Add your store details, logo, and business information.'], ['box-open', 'Add Your Products', 'List your products with images, descriptions and prices.'], ['chart-line', 'Start Selling', 'Your store goes live and you start earning!']]

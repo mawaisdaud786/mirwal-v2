@@ -2,9 +2,10 @@ import { useState } from 'react'
 import Header from './components/Header'
 import Footer from './components/Footer'
 import './seller-pages.css'
+import { navigateTo } from './navigation'
 
 const FaIcon = ({ name }) => <i className={`fa-solid fa-${name}`} aria-hidden="true" />
-function navigate(path) { window.history.pushState({}, '', path); window.dispatchEvent(new PopStateEvent('popstate')) }
+function navigate(path) { navigateTo(path) }
 const sellerBenefits = [['users', 'Millions of Customers', 'Reach millions of active buyers across Pakistan.'], ['circle-check', 'Zero Setup Fee', 'Start your business on Mirwal with zero setup fee.'], ['shield-halved', 'Low Commission', 'Competitive commission rates with no hidden charges.'], ['wallet', 'Secure Payments', 'Get paid safely and on time with protected transactions.'], ['headset', 'Seller Support', 'Dedicated support team to help you grow your business.']]
 function Field({ label, children, wide = false }) { return <label className={wide ? 'seller-field wide' : 'seller-field'}><span>{label} <em>*</em></span>{children}</label> }
 export default function SellerFormPage() {

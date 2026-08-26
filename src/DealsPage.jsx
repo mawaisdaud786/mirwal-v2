@@ -2,13 +2,11 @@ import { useState } from 'react'
 import { products } from './data/mockData'
 import Header from './components/Header'
 import Footer from './components/Footer'
+import { navigateTo } from './navigation'
 
 const FaIcon = ({ name }) => <i className={`fa-solid fa-${name}`} aria-hidden="true" />
 
-function navigate(path) {
-  window.history.pushState({}, '', path)
-  window.dispatchEvent(new PopStateEvent('popstate'))
-}
+function navigate(path) { navigateTo(path) }
 
 const dealCategories = [
   ['All Deals', 'table-cells-large'], ['Mobiles', 'mobile-screen-button'], ['Laptops', 'laptop'], ['Electronics', 'headphones'],

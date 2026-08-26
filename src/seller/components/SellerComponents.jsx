@@ -9,7 +9,6 @@ export const StatusBadge = ({ status, label }) => {
     active: 'success',
     inactive: 'warning',
     paid: 'success',
-    processing: 'warning',
     refunded: 'danger',
   }
 
@@ -49,7 +48,7 @@ export const DataTable = ({ columns, data, actions }) => {
           <tr>
             <td colSpan={columns.length + (actions ? 1 : 0)} style={{ textAlign: 'center', padding: '40px' }}>
               <div className="empty-state">
-                <div className="empty-state-icon">📭</div>
+                <div className="empty-state-icon"><i className="fa-solid fa-inbox" aria-hidden="true" /></div>
                 <h3 className="empty-state-title">No data found</h3>
                 <p className="empty-state-text">There are no records to display</p>
               </div>
@@ -88,10 +87,10 @@ export const DataTable = ({ columns, data, actions }) => {
 }
 
 // Empty State Component
-export const EmptyState = ({ icon = '📭', title, text, actionLabel, onAction }) => {
+export const EmptyState = ({ icon, title, text, actionLabel, onAction }) => {
   return (
     <div className="empty-state">
-      <div className="empty-state-icon">{icon}</div>
+      <div className="empty-state-icon">{icon || <i className="fa-solid fa-inbox" aria-hidden="true" />}</div>
       <h3 className="empty-state-title">{title}</h3>
       <p className="empty-state-text">{text}</p>
       {actionLabel && (
@@ -163,7 +162,7 @@ export const Pagination = ({ currentPage, totalPages, perPage, total, onPageChan
           <option value={100}>100 per page</option>
         </select>
         <button className="pagination-btn" onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1}>
-          ←
+          <i className="fa-solid fa-chevron-left" aria-hidden="true" />
         </button>
         {getPageNumbers().map((page, idx) =>
           page === '...' ? (
@@ -185,7 +184,7 @@ export const Pagination = ({ currentPage, totalPages, perPage, total, onPageChan
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
         >
-          →
+          <i className="fa-solid fa-chevron-right" aria-hidden="true" />
         </button>
       </div>
     </div>
@@ -225,7 +224,7 @@ export const Modal = ({ title, isOpen, onClose, children, onSubmit, submitLabel,
         <div className="modal-header">
           <h2 className="modal-title">{title}</h2>
           <button className="modal-close" onClick={onClose}>
-            ✕
+            <i className="fa-solid fa-xmark" aria-hidden="true" />
           </button>
         </div>
         <div className="modal-body">{children}</div>

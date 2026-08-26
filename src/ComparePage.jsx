@@ -4,11 +4,9 @@ import Header from './components/Header'
 import Footer from './components/Footer'
 import compareBanner from './assets/images/compare.png'
 import './compare.css'
+import { navigateTo } from './navigation'
 
-function navigate(path) {
-  window.history.pushState({}, '', path)
-  window.dispatchEvent(new PopStateEvent('popstate'))
-}
+function navigate(path) { navigateTo(path) }
 
 const FaIcon = ({ name }) => <i className={`fa-solid fa-${name}`} aria-hidden="true" />
 

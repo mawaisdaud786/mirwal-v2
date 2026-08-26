@@ -5,6 +5,19 @@
   background: var(--color-background);
 }
 
+/* Final reference sizing */
+.seller-header { height:58px !important; padding:0 18px !important; }.seller-search-box { max-width:380px !important; height:34px !important; }.seller-header-left { gap:13px !important; }.seller-content { padding:16px 18px 24px !important; background:#fafafa !important; }
+
+/* Reference dashboard shell overrides */
+.seller-sidebar { width:178px !important; background:#fff !important; color:var(--color-text) !important; border-right:1px solid var(--color-border-light) !important; overflow:hidden !important; }
+.seller-sidebar-brand { display:flex !important; height:58px !important; padding:0 16px !important; border-bottom:1px solid var(--color-border-light) !important; }.seller-nav { padding:0 8px !important; overflow:auto !important; }.seller-nav-section { padding:5px 0 !important; border-bottom:1px solid var(--color-border-light) !important; }.seller-nav-section h2 { margin:5px 8px !important; color:var(--color-text-secondary) !important; font-size:6px !important; letter-spacing:.04em; }.seller-nav-item { display:flex !important; width:100% !important; padding:7px 9px !important; border:0 !important; border-radius:5px !important; color:var(--color-text) !important; background:none !important; font-size:9px !important; }.seller-nav-item:hover,.seller-nav-item.active { color:var(--color-primary) !important; background:var(--color-primary-light) !important; }.seller-nav-item > i { width:13px !important; color:var(--color-text-secondary) !important; }.seller-nav-item.active > i { color:var(--color-primary) !important; }.seller-nav-item span,.seller-view-store { display:block !important; }.seller-nav-item em { display:block !important; }
+@media (max-width:800px) { .seller-sidebar { width:68px !important; }.seller-sidebar-brand { justify-content:center !important; padding:0 8px !important; }.seller-sidebar-brand > div,.seller-store-badge div,.seller-nav-item span,.seller-nav-section h2,.seller-nav-item em,.seller-view-store { display:none !important; }.seller-nav-item { justify-content:center !important; padding:9px 4px !important; }.seller-nav-item > i { width:auto !important; } }
+
+.seller-sidebar { width: 178px; background: #fff; color: var(--color-text); border-right: 1px solid var(--color-border-light); overflow: hidden; }
+.seller-sidebar-brand { display:flex; align-items:center; gap:7px; height:58px; padding:0 16px; border-bottom:1px solid var(--color-border-light); }
+.seller-brand-mark { color:var(--color-primary); font:800 32px/1 var(--font-heading); }.seller-sidebar-brand b { display:block; font:800 16px/1 var(--font-heading); }.seller-sidebar-brand small { display:block; margin-top:2px; color:var(--color-text-secondary); font-size:7px; }.seller-sidebar-brand button { margin-left:auto; padding:4px; color:var(--color-text-secondary); background:none; }.seller-store-badge { display:flex; align-items:center; gap:8px; margin:10px 10px 8px; padding:7px; border-radius:7px; background:var(--color-primary-lighter); cursor:pointer; }.seller-store-badge > span { display:grid; place-items:center; width:26px; height:26px; border-radius:50%; color:#fff; background:var(--color-primary); font-size:12px; }.seller-store-badge-text { min-width:0; }.seller-store-badge b,.seller-store-badge small { display:block; }.seller-store-badge b { font-size:9px; }.seller-store-badge small { width:max-content; margin-top:2px; padding:1px 4px; border-radius:3px; color:var(--color-success-dark); background:var(--color-success-light); font-size:7px; }.seller-nav { padding:0 8px; }.seller-nav-section { padding:5px 0; border-bottom:1px solid var(--color-border-light); }.seller-nav-section:last-child { border:0; }.seller-nav-section h2 { margin:6px 8px; color:var(--color-text-secondary); font-size:7px; font-weight:700; }.seller-nav-item { display:flex; align-items:center; gap:9px; width:100%; padding:7px 9px; border:0; border-radius:5px; color:var(--color-text); background:none; font-size:9px; text-align:left; }.seller-nav-item:hover { color:var(--color-primary); background:var(--color-primary-lighter); }.seller-nav-item.active { color:var(--color-primary); background:var(--color-primary-light); }.seller-nav-item > i { width:13px; color:var(--color-text-secondary); text-align:center; }.seller-nav-item.active > i { color:var(--color-primary); }.seller-nav-item span { flex:1; }.seller-nav-item em { padding:2px 5px; border-radius:8px; color:#fff; background:var(--color-primary); font-size:7px; font-style:normal; }.seller-view-store { display:flex; justify-content:space-between; width:calc(100% - 20px); margin:8px 10px; padding:7px 10px; border:1px solid var(--color-border); border-radius:5px; color:var(--color-text); background:#fff; font-size:8px; }.seller-view-store:hover { color:var(--color-primary); border-color:var(--color-primary); }.seller-sidebar-footer { display:none; }
+.seller-content { overflow:auto; padding:16px 18px 24px; background:#fafafa; }.seller-header { height:58px; padding:0 18px; }.seller-search-box { max-width:380px; height:34px; }.seller-header-left { gap:13px; }
+
 .seller-sidebar {
   width: 220px;
   background: #2a2a3e;
@@ -67,6 +80,14 @@
   flex: 1;
   overflow-y: auto;
   padding: 12px 0;
+}
+
+.seller-nav section h2 {
+  font: unset;
+  font-size: 16px;
+  color: #888;
+  padding: 8px 16px;
+  margin: 8px 0 0;
 }
 
 .seller-nav-section {
@@ -351,6 +372,10 @@
   font-weight: 600;
 }
 
+.seller-header-dropdown-wrap { position: relative; }
+.seller-notification-dropdown,.seller-profile-dropdown { position:absolute; top:calc(100% + 10px); right:0; z-index:30; width:300px; border:1px solid var(--color-border-light); border-radius:9px; background:#fff; box-shadow:0 12px 30px rgba(0,0,0,.14); overflow:hidden; }
+.seller-dropdown-heading { display:flex; justify-content:space-between; padding:12px; border-bottom:1px solid var(--color-border-light); font-size:11px; }.seller-dropdown-heading button,.seller-notification-item,.seller-view-notifications,.seller-profile-dropdown button { border:0; background:transparent; cursor:pointer; }.seller-dropdown-heading button,.seller-view-notifications { color:var(--color-primary); font-size:9px; }.seller-notification-item { display:flex; align-items:flex-start; gap:8px; width:100%; padding:10px 12px; text-align:left; }.seller-notification-item:hover,.seller-profile-dropdown button:hover { background:var(--color-surface-soft); }.seller-notification-item > span:nth-child(2) { display:flex; flex:1; flex-direction:column; gap:3px; min-width:0; }.seller-notification-item strong { font-size:10px; }.seller-notification-item small,.seller-notification-item em { color:var(--color-text-secondary); font-size:9px; font-style:normal; }.seller-notification-item.unread strong { color:var(--color-text); }.seller-notification-icon { display:grid; place-items:center; flex:0 0 28px; width:28px; height:28px; border-radius:50%; background:var(--color-primary-light); color:var(--color-primary); font-size:11px; }.seller-view-notifications { display:block; width:100%; padding:10px; border-top:1px solid var(--color-border-light); font-weight:700; }.seller-profile-dropdown { width:170px; padding:5px; }.seller-profile-dropdown button { display:block; width:100%; padding:8px 9px; border-radius:4px; color:var(--color-text); font-size:10px; text-align:left; }.seller-profile-dropdown hr { border:0; border-top:1px solid var(--color-border-light); }.seller-logout-backdrop { position:fixed; inset:0; z-index:50; display:grid; place-items:center; background:rgba(20,25,35,.35); }.seller-logout-dialog { width:min(360px,calc(100% - 32px)); padding:22px; border-radius:10px; background:#fff; box-shadow:0 20px 60px rgba(0,0,0,.2); }.seller-logout-dialog h2 { margin:0 0 18px; font-size:15px; }.seller-logout-dialog > div { display:flex; justify-content:flex-end; gap:8px; }
+
 .seller-user-menu {
   display: flex;
   align-items: center;
@@ -601,4 +626,31 @@
   .seller-page-subtitle {
     font-size: 12px;
   }
+}
+
+.seller-page-not-found {
+  display: flex;
+  min-height: 320px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.seller-page-not-found > i {
+  color: var(--color-primary);
+  font-size: 42px;
+}
+
+.seller-page-not-found h1 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 22px;
+}
+
+.seller-page-not-found p {
+  margin: 0 0 8px;
+  font-size: 12px;
 }

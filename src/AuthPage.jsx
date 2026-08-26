@@ -1,11 +1,9 @@
 import { useState } from 'react'
+import { navigateTo } from './navigation'
 
 const FaIcon = ({ name }) => <i className={`fa-solid fa-${name}`} aria-hidden="true" />
 
-function navigate(path) {
-  window.history.pushState({}, '', path)
-  window.dispatchEvent(new PopStateEvent('popstate'))
-}
+function navigate(path) { navigateTo(path) }
 
 const benefits = [
   ['tag', 'Exclusive Deals', 'Access members-only offers and discounts.'],
@@ -31,11 +29,12 @@ export default function AuthPage({ initialMode = 'signin' }) {
   function switchMode(nextMode) {
     setMode(nextMode)
     setMessage('')
-    window.history.replaceState({}, '', nextMode === 'signup' ? '/register' : '/login')
+    navigateTo(nextMode === 'signup' ? '/register' : '/login', { replace: true })
   }
 
   function submit(event) {
     event.preventDefault()
+    window.localStorage.setItem('mirwal-authenticated', 'true')
     setMessage(isSignUp ? 'Account created successfully.' : 'Welcome back. You are signed in.')
   }
 

@@ -1,138 +1,32 @@
+import { useMemo, useState } from 'react'
 import SellerLayout from '../SellerLayout'
-import { DataTable, Pagination } from '../components/SellerComponents'
 import { reviews } from '../../data/sellerMockData'
-import { useState } from 'react'
+import './reviews.css'
+import { navigateTo } from '../../navigation'
+
+const reviewRows = [
+  { ...reviews[0], customer: { name: 'Ali Raza', email: 'ali.raza@example.com' }, product: { name: 'Wireless Bluetooth Headphones', sku: 'MW-HP-001', icon: 'headphones' }, review: 'Excellent sound quality and battery life is amazing. Noise cancellation works great.', date: 'May 24, 2025', time: '10:30 AM', helpful: 12, status: 'Published' },
+  { ...reviews[1], customer: { name: 'Sana Khan', email: 'sana.khan@example.com' }, product: { name: 'Smart Watch Series 8', sku: 'MW-SW-002', icon: 'stopwatch' }, review: 'Very good watch. Display is bright and features are accurate. Worth the price.', date: 'May 24, 2025', time: '09:15 AM', helpful: 8, status: 'Published' },
+  { ...reviews[2], customer: { name: 'Usman Ahmed', email: 'usman.ahmed@example.com' }, product: { name: 'Premium Running Shoes', sku: 'MW-RS-003', icon: 'shoe-prints' }, review: 'Premium quality running shoes. It is a bit tight in size. Recommend going one size up.', date: 'May 23, 2025', time: '08:45 AM', helpful: 5, status: 'Published', rating: 4 },
+  { ...reviews[0], customer: { name: 'Fatima Noor', email: 'fatima.noor@example.com' }, product: { name: 'iPhone 15 Pro Case', sku: 'MW-PC-005', icon: 'mobile-screen-button' }, review: 'Not satisfied with battery life. It drains quickly and takes long to charge.', date: 'May 23, 2025', time: '04:20 PM', helpful: 2, status: 'Unpublished', verified: false, rating: 2 },
+  { ...reviews[1], customer: { name: 'Bilal Hussain', email: 'bilal.hussain@example.com' }, product: { name: 'LED Desk Lamp', sku: 'MW-DL-006', icon: 'lightbulb' }, review: 'Good build quality and looks premium.', date: 'May 23, 2025', time: '02:10 PM', helpful: 3, status: 'Published' },
+]
+
+const Stars = ({ rating }) => <span className="review-stars">{Array.from({ length: 5 }, (_, index) => <i className={`fa-solid fa-star ${index < rating ? '' : 'empty'}`} key={index} aria-hidden="true" />)}</span>
 
 const Reviews = () => {
-  const [currentPage, setCurrentPage] = useState(1)
-  const [perPage, setPerPage] = useState(10)
+  const [search, setSearch] = useState('')
+  const [status, setStatus] = useState('all')
+  const filteredReviews = useMemo(() => reviewRows.filter((item) => (status === 'all' || item.status.toLowerCase() === status) && `${item.customer.name} ${item.product.name} ${item.review}`.toLowerCase().includes(search.toLowerCase())), [search, status])
 
-  const reviewColumns = [
-    {
-      key: 'customer',
-      label: 'Customer',
-      render: (val) => (
-        <div className="table-cell-content">
-          <div className="table-avatar">{val.avatar}</div>
-          <div>
-            <div style={{ fontSize: '13px', fontWeight: '500' }}>{val.name}</div>
-            <div className="table-cell-text-muted">{val.email}</div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'product',
-      label: 'Product',
-      render: (val) => (
-        <div style={{ fontSize: '13px', fontWeight: '500' }}>
-          {val.image} {val.name}
-        </div>
-      ),
-    },
-    {
-      key: 'rating',
-      label: 'Rating',
-      render: (val) => <span style={{ color: '#f39a00', fontSize: '13px' }}>{'⭐'.repeat(val)}</span>,
-    },
-    {
-      key: 'review',
-      label: 'Review',
-      render: (val) => <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>{val}</span>,
-    },
-    { key: 'date', label: 'Date' },
-    {
-      key: 'status',
-      label: 'Status',
-      render: (val) => (
-        <span
-          style={{
-            background: val === 'Published' ? 'rgba(53, 147, 84, 0.15)' : 'rgba(243, 154, 0, 0.15)',
-            color: val === 'Published' ? 'var(--color-success)' : '#f39a00',
-            padding: '6px 12px',
-            borderRadius: '6px',
-            fontSize: '12px',
-            fontWeight: '600',
-          }}
-        >
-          {val}
-        </span>
-      ),
-    },
-  ]
-
-  const totalPages = Math.ceil(reviews.length / perPage)
-  const paginatedReviews = reviews.slice((currentPage - 1) * perPage, currentPage * perPage)
-
-  return (
-    <SellerLayout activeItem="reviews" breadcrumbs={[{ label: 'Dashboard' }, { label: 'Reviews' }]}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <h1 style={{ fontSize: '24px', fontWeight: '700', margin: '0 0 4px', fontFamily: 'var(--font-heading)' }}>
-              Product Reviews
-            </h1>
-            <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: '0' }}>
-              Manage and reply to customer reviews for your products.
-            </p>
-          </div>
-          <button
-            style={{
-              padding: '10px 16px',
-              background: 'var(--color-primary)',
-              color: '#fff',
-              border: '0',
-              borderRadius: '6px',
-              fontSize: '12px',
-              fontWeight: '600',
-              cursor: 'pointer',
-            }}
-          >
-            ⚙️ Review Settings
-          </button>
-        </div>
-
-        {/* Review Stats */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-            gap: '16px',
-          }}
-        >
-          <div style={{ background: '#fff', border: '1px solid var(--color-border-light)', borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
-            <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--color-text)' }}>23</div>
-            <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>All Reviews</div>
-          </div>
-          <div style={{ background: '#fff', border: '1px solid var(--color-border-light)', borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
-            <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--color-success)' }}>16</div>
-            <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>Positive (69.6%)</div>
-          </div>
-          <div style={{ background: '#fff', border: '1px solid var(--color-border-light)', borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
-            <div style={{ fontSize: '28px', fontWeight: '700', color: '#f39a00' }}>4</div>
-            <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>Neutral (17.4%)</div>
-          </div>
-          <div style={{ background: '#fff', border: '1px solid var(--color-border-light)', borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
-            <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--color-danger)' }}>3</div>
-            <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>Negative (13%)</div>
-          </div>
-        </div>
-
-        {/* Reviews Table */}
-        <div style={{ background: '#fff', border: '1px solid var(--color-border-light)', borderRadius: '12px', padding: '16px' }}>
-          <DataTable columns={reviewColumns} data={paginatedReviews} />
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            perPage={perPage}
-            total={reviews.length}
-            onPageChange={setCurrentPage}
-            onPerPageChange={setPerPage}
-          />
-        </div>
-      </div>
-    </SellerLayout>
-  )
+  return <SellerLayout activeItem="reviews" breadcrumbs={[{ label: 'Dashboard', onClick: () => navigateTo('/seller') }, { label: 'Reviews' }]}>
+    <div className="reviews-container">
+      <div className="reviews-header"><div><h1>Product Reviews</h1><p>Manage and reply to customer reviews for your products.</p></div><button type="button" className="reviews-export"><i className="fa-solid fa-upload" aria-hidden="true" /> Export Reviews</button></div>
+      <div className="review-stats"><article><span>Average Rating</span><strong>4.6 <Stars rating={4} /></strong><small>Based on 256 reviews</small></article><article><span>Total Reviews</span><strong>256</strong><small className="positive"><i className="fa-solid fa-arrow-up" aria-hidden="true" /> 12 this week</small><i className="stat-icon purple fa-solid fa-clipboard-list" /></article><article><span>Verified Purchase</span><strong>82%</strong><small>210 reviews</small><i className="stat-icon green fa-solid fa-bag-shopping" /></article><article><span>Unanswered Reviews</span><strong>18</strong><button type="button">View all</button><i className="stat-icon orange fa-solid fa-comment-dots" /></article><article className="rating-breakdown"><span>Rating Breakdown</span>{[[5, 62, 159], [4, 23, 59], [3, 8, 20], [2, 4, 10], [1, 3, 8]].map(([stars, percent, count]) => <div key={stars}><small>{stars} Star</small><b><i style={{ width: `${percent}%` }} /></b><small>{percent}% ({count})</small></div>)}</article></div>
+      <div className="review-insights"><article><h2>Customer Sentiment (AI)</h2><div className="sentiment-body"><div className="sentiment-donut" /><div><p><i className="positive-dot" /> Positive <b>82% (210)</b></p><p><i className="neutral-dot" /> Neutral <b>11% (28)</b></p><p><i className="negative-dot" /> Negative <b>7% (18)</b></p></div></div></article><article><h2>Top Positive Feedback</h2>{[['Sound Quality', 92], ['Comfort', 87], ['Battery Life', 83], ['Build Quality', 81], ['Value for Money', 78]].map(([label, value]) => <p className="feedback-row" key={label}><span>{label}</span><b><i style={{ width: `${value}%` }} /></b><small>{value}%</small></p>)}</article><article className="ai-summary"><h2><i className="fa-solid fa-wand-magic-sparkles" aria-hidden="true" /> AI Review Summary</h2><p>Customers are highly satisfied with the sound quality and comfort of this product. Many appreciate the noise cancellation feature and long battery life. Some customers mentioned that the carrying case could be improved.</p></article><article><h2>Reviews Over Time</h2><div className="review-line-chart"><svg viewBox="0 0 300 100" preserveAspectRatio="none"><polyline points="5,68 60,58 115,48 170,70 225,78 270,85 298,56" /></svg><div><span>May 18</span><span>May 24</span></div></div></article></div>
+      <section className="reviews-workspace"><div className="reviews-filters"><label><i className="fa-solid fa-magnifying-glass" aria-hidden="true" /><input aria-label="Search reviews" placeholder="Search reviews by product or customer..." value={search} onChange={(event) => setSearch(event.target.value)} /></label><select aria-label="Filter products"><option>All Products</option></select><select aria-label="Filter ratings"><option>All Ratings</option></select><select aria-label="Filter verified purchases"><option>Verified Purchase</option></select><select aria-label="Filter review status" value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">All Status</option><option value="published">Published</option><option value="unpublished">Unpublished</option></select><button type="button"><i className="fa-solid fa-filter" aria-hidden="true" /> Filters</button><button type="button" className="reset-reviews" onClick={() => { setSearch(''); setStatus('all') }}><i className="fa-solid fa-rotate-left" aria-hidden="true" /> Reset</button></div><div className="review-tabs"><button className={status === 'all' ? 'active' : ''} type="button" onClick={() => setStatus('all')}>All Reviews (256)</button><button type="button">Published (238)</button><button type="button">Unpublished (18)</button><button type="button">Flagged (7)</button><button type="button">Spam (3)</button><button type="button">Trash (0)</button></div><div className="reviews-table-wrap"><table className="reviews-table"><thead><tr><th><input type="checkbox" aria-label="Select all reviews" /></th><th>Review</th><th>Product</th><th>Customer</th><th>Rating</th><th>Date</th><th>Status</th><th>Images / Videos</th><th>Helpful</th><th>Actions</th></tr></thead><tbody>{filteredReviews.map((item) => <tr key={item.id + item.customer.name}><td><input type="checkbox" aria-label={`Select review by ${item.customer.name}`} /></td><td><div className="review-copy"><strong>{item.customer.name}</strong><small>{item.review}</small><em className={item.verified ? 'verified' : 'unverified'}>{item.verified ? 'Verified Purchase' : 'Unverified'}</em></div></td><td><div className="review-product"><span><i className={`fa-solid fa-${item.product.icon}`} aria-hidden="true" /></span><b>{item.product.name}</b><small>SKU: {item.product.sku}</small></div></td><td><strong>{item.customer.name}</strong><small>{item.customer.email}</small></td><td><Stars rating={item.rating} /></td><td>{item.date}<small>{item.time}</small></td><td><em className={`review-status ${item.status.toLowerCase()}`}>{item.status}</em></td><td><span className="media-placeholder"><i className="fa-regular fa-image" aria-hidden="true" /></span> +2</td><td><i className="fa-regular fa-thumbs-up" aria-hidden="true" /> Helpful ({item.helpful})</td><td><div className="review-actions"><button type="button">Reply</button><button type="button" aria-label={`More actions for ${item.customer.name}`}><i className="fa-solid fa-ellipsis-vertical" aria-hidden="true" /></button></div></td></tr>)}</tbody></table></div><div className="reviews-pagination"><span>Showing 1 to {filteredReviews.length} of 256 reviews</span><div><button type="button" disabled><i className="fa-solid fa-chevron-left" aria-hidden="true" /></button><button type="button" className="active">1</button><button type="button">2</button><button type="button">3</button><span>...</span><button type="button">26</button><button type="button"><i className="fa-solid fa-chevron-right" aria-hidden="true" /></button></div><label>Show <select aria-label="Reviews per page"><option>10</option></select> per page</label></div></section>
+    </div>
+  </SellerLayout>
 }
 
 export default Reviews

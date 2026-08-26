@@ -10,16 +10,16 @@ export const categories = [
 ]
 
 export const products = [
-  { id: 'apple-iphone-15', name: 'Apple iPhone 15 (128GB)', type: 'Smartphone', price: 'Rs. 234,000', old: 'Rs. 202,000', rating: '4.8 (1.2k)', badge: '-30%', image: 'https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=500&q=85' },
-  { id: 'samsung-galaxy-watch-6', name: 'Samsung Galaxy Watch 6', type: 'Smartwatch', price: 'Rs. 44,990', old: 'Rs. 63,990', rating: '4.6 (610)', badge: 'Best Seller', image: 'https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=500&q=85' },
-  { id: 'dell-inspiron-15', name: 'Dell Inspiron 15 3530', type: 'Laptop', price: 'Rs. 164,990', old: 'Rs. 194,990', rating: '4.5 (856)', badge: '-15%', image: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=500&q=85' },
-  { id: 'sony-wf-1000xm5', name: 'Sony WF-1000XM5', type: 'Wireless earbuds', price: 'Rs. 39,990', old: 'Rs. 49,000', rating: '4.7 (256)', badge: 'Great Value', image: 'https://images.unsplash.com/photo-1606220945770-b5b6c2c55bf1?w=500&q=85' },
-  { id: 'philips-air-fryer', name: 'Philips Air Fryer HD9252', type: 'Kitchen appliance', price: 'Rs. 28,990', old: 'Rs. 38,990', rating: '4.6 (319)', badge: '-25%', image: 'https://images.unsplash.com/photo-1585515320310-259814833e62?w=500&q=85' },
-  { id: 'jbl-tune-770nc', name: 'JBL Tune 770NC', type: 'Headphones', price: 'Rs. 26,999', old: '', rating: '4.4 (203)', image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&q=85' },
-  { id: 'canon-eos-200d', name: 'Canon EOS 200D II', type: 'Camera', price: 'Rs. 111,999', old: '', rating: '4.7 (542)', image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=500&q=85' },
-  { id: 'lenovo-ideapad-slim-3', name: 'Lenovo IdeaPad Slim 3', type: 'Laptop', price: 'Rs. 129,999', old: '', rating: '4.5 (105)', image: 'https://images.unsplash.com/photo-1531297484001-80022131f5a1?w=500&q=85' },
-  { id: 'amazfit-gtr-4', name: 'Amazfit GTR 4', type: 'Smartwatch', price: 'Rs. 34,999', old: '', rating: '4.4 (112)', image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&q=85' },
-  { id: 'mi-11-lite', name: 'Mi 11 Lite 5G NE', type: 'Smartphone', price: 'Rs. 55,999', old: '', rating: '4.6 (390)', image: 'https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=500&q=85' },
+  { id: 'apple-iphone-15', name: 'Apple iPhone 15 (128GB)', type: 'Smartphone', category: 'Electronics', price: 'Rs. 234,000', old: 'Rs. 202,000', rating: '4.8 (1.2k)', badge: '-30%', image: 'https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=500&q=85' },
+  { id: 'samsung-galaxy-watch-6', name: 'Samsung Galaxy Watch 6', type: 'Smartwatch', category: 'Electronics', price: 'Rs. 44,990', old: 'Rs. 63,990', rating: '4.6 (610)', badge: 'Best Seller', image: 'https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=500&q=85' },
+  { id: 'dell-inspiron-15', name: 'Dell Inspiron 15 3530', type: 'Laptop', category: 'Electronics', price: 'Rs. 164,990', old: 'Rs. 194,990', rating: '4.5 (856)', badge: '-15%', image: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=500&q=85' },
+  { id: 'sony-wf-1000xm5', name: 'Sony WF-1000XM5', type: 'Wireless earbuds', category: 'Electronics', price: 'Rs. 39,990', old: 'Rs. 49,000', rating: '4.7 (256)', badge: 'Great Value', image: 'https://images.unsplash.com/photo-1606220945770-b5b6c2c55bf1?w=500&q=85' },
+  { id: 'philips-air-fryer', name: 'Philips Air Fryer HD9252', type: 'Kitchen appliance', category: 'Home & Living', price: 'Rs. 28,990', old: 'Rs. 38,990', rating: '4.6 (319)', badge: '-25%', image: 'https://images.unsplash.com/photo-1585515320310-259814833e62?w=500&q=85' },
+  { id: 'jbl-tune-770nc', name: 'JBL Tune 770NC', type: 'Headphones', category: 'Electronics', price: 'Rs. 26,999', old: '', rating: '4.4 (203)', image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&q=85' },
+  { id: 'canon-eos-200d', name: 'Canon EOS 200D II', type: 'Camera', category: 'Electronics', price: 'Rs. 111,999', old: '', rating: '4.7 (542)', image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=500&q=85' },
+  { id: 'lenovo-ideapad-slim-3', name: 'Lenovo IdeaPad Slim 3', type: 'Laptop', category: 'Electronics', price: 'Rs. 129,999', old: '', rating: '4.5 (105)', image: 'https://images.unsplash.com/photo-1531297484001-80022131f5a1?w=500&q=85' },
+  { id: 'amazfit-gtr-4', name: 'Amazfit GTR 4', type: 'Smartwatch', category: 'Electronics', price: 'Rs. 34,999', old: '', rating: '4.4 (112)', image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&q=85' },
+  { id: 'mi-11-lite', name: 'Mi 11 Lite 5G NE', type: 'Smartphone', category: 'Electronics', price: 'Rs. 55,999', old: '', rating: '4.6 (390)', image: 'https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=500&q=85' },
 ]
 
 export const reviews = [

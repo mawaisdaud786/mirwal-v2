@@ -1,13 +1,11 @@
 import Header from './components/Header'
 import Footer from './components/Footer'
 import { products } from './data/mockData'
+import { navigateTo } from './navigation'
 
 const FaIcon = ({ name }) => <i className={`fa-solid fa-${name}`} aria-hidden="true" />
 
-function navigate(path) {
-  window.history.pushState({}, '', path)
-  window.dispatchEvent(new PopStateEvent('popstate'))
-}
+function navigate(path) { navigateTo(path) }
 
 function money(value) {
   return `Rs. ${value.toLocaleString('en-PK')}`

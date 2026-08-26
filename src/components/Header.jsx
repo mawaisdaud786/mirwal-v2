@@ -1,23 +1,311 @@
-import { useState } from 'react'
+import { useContext, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { navigateTo, SiteChromeContext } from "../navigation";
+import "./header-redesign.css";
 
-const FaIcon = ({ name }) => <i className={`fa-solid fa-${name}`} aria-hidden="true" />
-
+const FaIcon = ({ name }) => (
+  <i className={`fa-solid fa-${name}`} aria-hidden="true" />
+);
 function navigate(path) {
-  window.history.pushState({}, '', path)
-  window.dispatchEvent(new PopStateEvent('popstate'))
+  navigateTo(path);
 }
 
-export default function Header({ cartCount = 0 }) {
-  const [category, setCategory] = useState('All Categories')
-  const categories = ['All Categories', 'Electronics', 'Home & Living', 'Fashion', 'Beauty & Health']
-
-  return <>
-    <div className="utility"><span><FaIcon name="location-dot" /> Delivering to <b>Lahore, Pakistan</b></span><strong><FaIcon name="wand-magic-sparkles" /> Smart Shopping, Better Living</strong><span><button type="button" onClick={() => navigate('/sell-with-mirwal')}><FaIcon name="store" /> Become a Seller</button><a href="mailto:support@mirwal.com"><FaIcon name="headset" /> Help &amp; Support</a><button type="button" onClick={() => navigate('/login')}><FaIcon name="cube" /> Track Order</button></span></div>
-    <header className="header container">
-      <div className="brand"><span className="brand-mark">M</span><div><b>MIRWAL</b><small>All finds. You choose.</small></div></div>
-      <div className="search"><div className="search-category dropdown"><button className="search-category-toggle dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">{category}</button><ul className="dropdown-menu dropdown-menu-start">{categories.map((item) => <li key={item}><button className="dropdown-item" type="button" onClick={() => setCategory(item)}>{item}</button></li>)}</ul></div><FaIcon name="magnifying-glass" /><input className="form-control" type="search" placeholder="Search for products, brands or solve your shopping problem..." aria-label="Search products" /><button className="btn" type="button" aria-label="Search"><FaIcon name="magnifying-glass" /></button></div>
-      <div className="actions"><button type="button" onClick={() => navigate('/compare')}><span className="action-icon"><FaIcon name="scale-balanced" /><i>0</i></span><span>Compare</span></button><button type="button"><span className="action-icon"><FaIcon name="heart" /><i>0</i></span><span>Wishlist</span></button><button type="button" onClick={() => navigate('/cart')}><span className="action-icon"><FaIcon name="cart-shopping" /><i>{cartCount}</i></span><span>Cart</span></button></div>
-    </header>
-    <nav className="nav container"><div className="category-dropdown dropdown"><button className="category-button btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"><FaIcon name="bars" /> All Categories</button><ul className="dropdown-menu"><li><a className="dropdown-item" href="#electronics">Electronics</a></li><li><a className="dropdown-item" href="#home-living">Home & Living</a></li><li><a className="dropdown-item" href="#fashion">Fashion</a></li><li><a className="dropdown-item" href="#beauty-health">Beauty & Health</a></li><li><a className="dropdown-item" href="#sports-outdoors">Sports & Outdoors</a></li><li><a className="dropdown-item" href="#baby-toys">Baby & Toys</a></li><li><a className="dropdown-item" href="#automotive">Automotive</a></li></ul></div><div className="links"><a className="active" onClick={() => navigate('/')}><FaIcon name="house" /> Home</a><a className="explore-nav-link" onClick={() => navigate('/explore')}><FaIcon name="grip" /> Explore</a><a className="deals-nav-link" onClick={() => navigate('/deals')}><FaIcon name="tag" /> Deals</a><a onClick={() => navigate('/compare')}><FaIcon name="scale-balanced" /> Compare</a><a onClick={() => navigate('/ai-assistant')}><FaIcon name="wand-magic-sparkles" /> AI Solution <em>New</em></a><a><FaIcon name="pen-to-square" /> Blog</a></div><button className="login btn btn-outline-primary" type="button" onClick={() => navigate('/login')}><FaIcon name="user" /> Login / Register</button></nav>
-  </>
+export default function Header({
+  cartCount = 0,
+  showNav = true,
+  isLoggedIn = true,
+  global = false,
+}) {
+  const [category, setCategory] = useState("All Categories");
+  const [location, setLocation] = useState("Lahore, Pakistan");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const { pathname: currentPath } = useLocation();
+  const chromeIsMounted = useContext(SiteChromeContext);
+  if (chromeIsMounted && !global) return null;
+  const categories = [
+    "All Categories",
+    "Electronics",
+    "Home & Living",
+    "Fashion",
+    "Beauty & Health",
+  ];
+  const navItems = [
+    ["house", "Home", "/"],
+    ["grip", "Explore", "/explore"],
+    ["tag", "Deals", "/deals"],
+    ["scale-balanced", "Compare", "/compare"],
+    ["wand-magic-sparkles", "AI Solution", "/ai-assistant"],
+    ["pen-to-square", "Blog", "/blog"],
+  ];
+  return (
+    <div className="site-header">
+      <div className="site-utility">
+        <div className="site-utility-inner">
+          <div className="location-menu dropdown">
+            <button
+              type="button"
+              className="site-utility-link dropdown-toggle"
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+            >
+              <FaIcon name="location-dot" /> Delivering to{" "}
+              <strong>{location}</strong>
+            </button>
+            <ul className="dropdown-menu">
+              <li>
+                <button
+                  type="button"
+                  className="dropdown-item"
+                  onClick={() => setLocation("Lahore, Pakistan")}
+                >
+                  Lahore, Pakistan
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className="dropdown-item"
+                  onClick={() => setLocation("Karachi, Pakistan")}
+                >
+                  Karachi, Pakistan
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className="dropdown-item"
+                  onClick={() => setLocation("Islamabad, Pakistan")}
+                >
+                  Islamabad, Pakistan
+                </button>
+              </li>
+            </ul>
+          </div>
+          <span className="site-promise">
+            <FaIcon name="wand-magic-sparkles" /> Smart Shopping, Better Living
+          </span>
+          <div className="site-utility-actions">
+            <button type="button" onClick={() => navigate("/sell-with-mirwal")}>
+              <FaIcon name="store" /> Become a Seller
+            </button>
+            <button type="button" onClick={() => navigate("/help-center")}>
+              <FaIcon name="headset" /> Help &amp; Support
+            </button>
+            <button type="button" onClick={() => navigate("/track-orders")}>
+              <FaIcon name="box" /> Track Order
+            </button>
+          </div>
+        </div>
+      </div>
+      <header className="site-main-header container">
+        <button
+          className="site-brand"
+          type="button"
+          onClick={() => navigate("/")}
+        >
+          <span className="site-brand-mark">M</span>
+          <span>
+            <b>MIRWAL</b>
+            <small>All finds. You choose.</small>
+          </span>
+        </button>
+        <form
+          className="site-search"
+          onSubmit={(event) => {
+            event.preventDefault();
+            navigate("/explore");
+          }}
+        >
+          <div className="site-search-category dropdown">
+            <button
+              type="button"
+              className="site-search-category-button dropdown-toggle"
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+            >
+              {category}
+            </button>
+            <ul className="dropdown-menu">
+              {categories.map((item) => (
+                <li key={item}>
+                  <button
+                    type="button"
+                    className="dropdown-item"
+                    onClick={() => setCategory(item)}
+                  >
+                    {item}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <FaIcon name="magnifying-glass" />
+          <input
+            type="search"
+            placeholder="Search products, brands or solve your shopping problem..."
+            aria-label="Search products"
+          />
+          <button type="submit" aria-label="Search">
+            <FaIcon name="magnifying-glass" />
+          </button>
+        </form>
+        <button
+          className="site-menu-toggle"
+          type="button"
+          aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen(!menuOpen)}
+        >
+          <FaIcon name={menuOpen ? "xmark" : "bars"} />
+        </button>
+        <div className="site-actions">
+          <button type="button" onClick={() => navigate("/compare")}>
+            <span>
+              <FaIcon name="scale-balanced" />
+              <i>0</i>
+            </span>
+            <small>Compare</small>
+          </button>
+          <button type="button" onClick={() => navigate("/wishlist")}>
+            <span>
+              <FaIcon name="heart" />
+              <i>0</i>
+            </span>
+            <small>Wishlist</small>
+          </button>
+          <button type="button" onClick={() => navigate("/cart")}>
+            <span>
+              <FaIcon name="cart-plus" />
+              <i>{cartCount}</i>
+            </span>
+            <small>Cart</small>
+          </button>
+          {isLoggedIn ? (
+            <div className="site-user-menu dropdown">
+              <button
+                className="site-user dropdown-toggle"
+                type="button"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+              >
+                <img
+                  src="https://i.pravatar.cc/80?img=11"
+                  alt="Muhammad Umar"
+                />
+                <span>Umar</span>
+              </button>
+              <ul className="dropdown-menu dropdown-menu-end">
+                <li>
+                  <button
+                    type="button"
+                    className="dropdown-item"
+                    onClick={() => navigate("/profile")}
+                  >
+                    <FaIcon name="user" /> My Profile
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    className="dropdown-item"
+                    onClick={() => navigate("/orders")}
+                  >
+                    <FaIcon name="box" /> My Orders
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    className="dropdown-item"
+                    onClick={() => navigate("/settings")}
+                  >
+                    <FaIcon name="gear" /> Settings
+                  </button>
+                </li>
+                <li>
+                  <hr className="dropdown-divider" />
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    className="dropdown-item"
+                    onClick={() => navigate("/logout")}
+                  >
+                    <FaIcon name="right-from-bracket" /> Logout
+                  </button>
+                </li>
+              </ul>
+            </div>
+          ) : (
+            <button
+              className="site-sign-in"
+              type="button"
+              onClick={() => navigate("/login")}
+            >
+              <FaIcon name="user" /> Sign In
+            </button>
+          )}
+        </div>
+      </header>
+      {showNav && (
+        <nav className={`site-nav${menuOpen ? " open" : ""}`}>
+          <div className="site-nav-inner container">
+            <div className="site-category-menu dropdown">
+              <button
+                className="site-category-button dropdown-toggle"
+                type="button"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+              >
+                <FaIcon name="bars" /> All Categories
+              </button>
+              <ul className="dropdown-menu">
+                {categories.slice(1).map((item) => (
+                  <li key={item}>
+                    <button
+                      type="button"
+                      className="dropdown-item"
+                      onClick={() => setCategory(item)}
+                    >
+                      {item}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="site-nav-links">
+              {navItems.map(([icon, label, path]) => (
+                <button
+                  type="button"
+                  className={currentPath === path ? "active" : ""}
+                  key={label}
+                  onClick={() => navigate(path)}
+                >
+                  <FaIcon name={icon} /> {label}
+                  {label === "AI Solution" && <em>New</em>}
+                </button>
+              ))}
+            </div>
+            {isLoggedIn ? (
+              <button
+                className="site-account-button"
+                type="button"
+                onClick={() => navigate("/profile")}
+              >
+                <FaIcon name="user" /> My Account
+              </button>
+            ) : (
+              <button
+                className="site-account-button"
+                type="button"
+                onClick={() => navigate("/login")}
+              >
+                <FaIcon name="user" /> Login / Register
+              </button>
+            )}
+          </div>
+        </nav>
+      )}
+    </div>
+  );
 }
