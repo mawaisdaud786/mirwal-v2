@@ -1,0 +1,56 @@
+.shipping-page{max-width:1240px;margin:auto;display:flex;flex-direction:column;gap:10px}.shipping-heading{display:flex;justify-content:space-between;align-items:flex-start}.shipping-heading h1{margin:0;font:800 26px var(--font-heading)}.shipping-heading p{display:flex;gap:6px;align-items:center;margin:3px 0;color:var(--admin-text-muted);font-size:var(--font-size-xl)}.shipping-heading button,.shipping-actions button,.shipping-fields button{padding:7px 10px;border:1px solid var(--admin-border);border-radius:5px;color:#52606b;background:#fff;font-size:var(--font-size-xl)}.shipping-heading .primary,.shipping-fields .primary{border-color:var(--color-primary);color:#fff;background:var(--color-primary)}.shipping-tabs{display:flex;gap:4px;padding:5px 8px;border:1px solid var(--admin-border);border-radius:6px;background:#fff;overflow:auto}.shipping-tabs button{display:flex;align-items:center;gap:6px;padding:7px 8px;border:0;border-bottom:2px solid transparent;color:#52606b;background:#fff;white-space:nowrap;font-size:var(--font-size-xl)}.shipping-tabs button.active{color:var(--color-primary);border-color:var(--color-primary);font-weight:700}.shipping-overview,.shipping-grid{display:grid;gap:10px}.shipping-overview{grid-template-columns:1fr 1fr 1.2fr}.shipping-grid.two{grid-template-columns:1fr 1fr}.shipping-panel{min-width:0;padding:11px;border:1px solid var(--admin-border);border-radius:8px;background:#fff;box-shadow:var(--admin-shadow-card)}.shipping-panel h2{margin:0 0 9px;font:800 16px var(--font-heading)}.shipping-panel p{display:flex;align-items:center;gap:7px;padding:7px 0;margin:0;border-bottom:1px solid var(--admin-border-light);color:var(--admin-text-muted);font-size:var(--font-size-xl)}.shipping-panel p b{margin-left:auto;color:var(--admin-text-secondary)}.shipping-panel p .shipping-status{margin-left:auto}.shipping-status{padding:3px 7px;border-radius:8px;color:var(--admin-success);background:var(--admin-success-light);font-size:var(--font-size-lg)}.shipping-status.inactive{color:var(--admin-danger);background:var(--admin-danger-light)}.shipping-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.shipping-kpis article{position:relative;min-height:72px;padding:10px;border:1px solid var(--admin-border);border-radius:8px;background:#fff;box-shadow:var(--admin-shadow-card)}.shipping-kpis span{position:absolute;top:11px;right:10px;display:grid;place-items:center;width:27px;height:27px;border-radius:7px;color:#6847c7;background:var(--admin-info-light)}.shipping-kpis span.tone-1{color:var(--admin-success);background:var(--admin-success-light)}.shipping-kpis span.tone-2{color:var(--admin-warning);background:var(--admin-warning-light)}.shipping-kpis span.tone-3{color:var(--admin-danger);background:var(--admin-danger-light)}.shipping-kpis small,.shipping-kpis strong,.shipping-kpis em{display:block}.shipping-kpis small{color:var(--admin-text-muted);font-size:var(--font-size-lg)}.shipping-kpis strong{margin-top:6px;font:800 20px var(--font-heading)}.shipping-kpis em{margin-top:4px;color:var(--admin-success);font-size:var(--font-size-lg);font-style:normal}.shipping-kpis em i{color:var(--admin-text-muted);font-style:normal}.shipping-ring{width:112px;height:112px;margin:10px auto;display:grid;place-items:center;border:12px solid #4e7ff0;border-right-color:#7b61e8;border-bottom-color:#4e7ff0;border-radius:50%;font:800 21px var(--font-heading);text-align:center}.shipping-ring small{display:block;font:6px var(--font-body)}.legend{line-height:2;color:var(--admin-text-muted);font-size:var(--font-size-lg)}.legend b{float:right;color:var(--admin-text-secondary)}.shipping-actions{display:flex;gap:8px;flex-wrap:wrap}.shipping-actions button{display:flex;align-items:center;gap:6px}.shipping-table-wrap{overflow:auto}.shipping-table{width:100%;min-width:720px;border-collapse:collapse;font-size:var(--font-size-xl)}.shipping-table th{padding:8px 5px;color:var(--admin-text-muted);background:var(--admin-surface-muted);text-align:left;font-weight:600}.shipping-table td{padding:8px 5px;border-top:1px solid var(--admin-border-light);color:var(--admin-text-secondary);white-space:nowrap}.shipping-table td button{border:0;color:var(--admin-text-muted);background:transparent}.shipping-pagination{display:flex;justify-content:space-between;padding-top:10px;color:var(--admin-text-muted);font-size:var(--font-size-lg)}.shipping-pagination span b{padding:4px 7px;border:1px solid var(--color-primary);border-radius:4px;color:var(--color-primary)}.shipping-fields label{display:block;margin-bottom:9px;color:#586772;font-size:var(--font-size-xl)}.shipping-fields input,.shipping-fields select,.shipping-fields textarea{display:block;width:100%;min-height:27px;margin-top:4px;padding:6px 8px;border:1px solid var(--admin-border);border-radius:4px;outline:0;color:#27343d;background:#fff;font:var(--font-size-md) var(--font-body)}.shipping-fields textarea{height:55px;resize:vertical}.shipping-fields button{margin-top:2px}
+@media(max-width:800px){.shipping-overview,.shipping-grid.two{grid-template-columns:1fr 1fr}.shipping-overview .shipping-panel:last-child{grid-column:span 2}.shipping-kpis{grid-template-columns:repeat(2,1fr)}}@media(max-width:600px){.shipping-heading{display:block}.shipping-heading button{margin:10px 0 0 auto}.shipping-overview,.shipping-grid.two{grid-template-columns:1fr}.shipping-overview .shipping-panel:last-child{grid-column:auto}.shipping-pagination{flex-wrap:wrap;gap:8px}.shipping-pagination span{width:100%}}
+/* ============================================================================
+   Real shipping configuration — zones, their methods, and warehouses.
+   ============================================================================ */
+
+.shipping-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+.shipping-kpis article { padding: 12px; border: 1px solid var(--admin-border); border-radius: 8px; background: #fff; box-shadow: var(--admin-shadow-card); }
+.shipping-kpis small { display: block; color: var(--admin-text-muted); font-size: var(--font-size-lg); }
+.shipping-kpis strong { display: block; margin-top: 6px; font: 800 22px var(--font-heading); }
+.shipping-kpis em { display: block; margin-top: 3px; color: var(--admin-text-muted); font-size: var(--font-size-md); font-style: normal; }
+
+.shipping-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 10px; }
+.shipping-panel-head h2 { margin: 0; font: 800 16px var(--font-heading); }
+.shipping-note { margin: 5px 0 0; max-width: 70ch; color: var(--admin-text-muted); font-size: var(--font-size-lg); line-height: 1.55; }
+.shipping-note.error { color: var(--admin-danger); }
+
+.shipping-flash { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 13px; border-radius: 7px; font-size: var(--font-size-xl); }
+.shipping-flash.success { color: var(--admin-success); background: var(--admin-success-light); }
+.shipping-flash.error { color: var(--admin-danger); background: var(--admin-danger-light); }
+
+.shipping-zone { margin-top: 12px; border: 1px solid var(--admin-border); border-radius: 8px; overflow: hidden; }
+.shipping-zone.inactive { opacity: .62; }
+.shipping-zone > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 13px; background: var(--admin-surface-soft, #f7f8fa); }
+.shipping-zone > header strong { font-size: var(--font-size-xl); }
+.shipping-zone > header small { display: block; margin-top: 2px; color: var(--admin-text-muted); font-size: var(--font-size-md); }
+.shipping-zone-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.shipping-zone-actions button, .shipping-row-actions button { padding: 5px 10px; border: 1px solid var(--admin-border); border-radius: 5px; background: #fff; color: var(--admin-text-secondary); font-size: var(--font-size-md); }
+.shipping-zone-actions button.danger, .shipping-row-actions button.danger { color: var(--admin-danger); border-color: var(--admin-danger-light); }
+.shipping-zone > .shipping-note { padding: 11px 13px; }
+
+.shipping-methods { width: 100%; border-collapse: collapse; font-size: var(--font-size-lg); }
+.shipping-methods th { padding: 8px 13px; border-bottom: 1px solid var(--admin-border); color: var(--admin-text-muted); font-weight: 700; text-align: left; }
+.shipping-methods td { padding: 9px 13px; border-bottom: 1px solid var(--admin-border-light); color: var(--admin-text-secondary); vertical-align: top; }
+.shipping-methods tbody tr:last-child td { border-bottom: 0; }
+.shipping-methods tr.inactive td { opacity: .6; }
+.shipping-methods td small { display: block; margin-top: 2px; color: var(--admin-text-muted); font-size: var(--font-size-md); }
+.shipping-row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+
+.shipping-form { display: flex; flex-direction: column; gap: 10px; margin: 12px 13px; padding: 14px; border: 1px solid var(--admin-border); border-radius: 8px; background: var(--admin-surface-soft, #f7f8fa); }
+.shipping-form h3 { margin: 0; font: 800 15px var(--font-heading); }
+.shipping-form label { display: flex; flex-direction: column; gap: 4px; color: var(--admin-text-secondary); font-size: var(--font-size-lg); font-weight: 600; }
+.shipping-form label small { color: var(--admin-text-muted); font-size: var(--font-size-md); font-weight: 400; line-height: 1.5; }
+.shipping-form input, .shipping-form select { padding: 8px 10px; border: 1px solid var(--admin-border); border-radius: 6px; background: #fff; font: var(--font-size-lg) var(--font-body); }
+.shipping-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.shipping-form-actions { display: flex; gap: 8px; }
+.shipping-form-actions button { padding: 8px 14px; border: 1px solid var(--admin-border); border-radius: 6px; background: #fff; font-size: var(--font-size-lg); }
+.shipping-form-actions button.primary { border-color: transparent; background: #6847c7; color: #fff; font-weight: 700; }
+.shipping-check { flex-direction: row !important; align-items: center; gap: 8px !important; font-weight: 400 !important; }
+.shipping-check input { width: auto; }
+
+@media (max-width: 760px) {
+  .shipping-kpis { grid-template-columns: 1fr; }
+  .shipping-panel-head, .shipping-zone > header { flex-direction: column; align-items: stretch; }
+  .shipping-form-row { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,96 @@
+        <Route element={<RequireRole role="admin" />}>
+        {/* ADMIN */}
+        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/admin/analytics" element={<AdminAnalytics />} />
+        <Route path="/admin/notifications" element={<AdminNotifications />} />
+        <Route path="/admin/notifications/*" element={<AdminNotificationSettings />} />
+        <Route path="/admin/settings" element={<AdminSettingsPages />} />
+        <Route path="/admin/settings/*" element={<AdminSettingsPages />} />
+        <Route path="/admin/security" element={<AdminSecurityPages />} />
+        <Route path="/admin/security/*" element={<AdminSecurityPages />} />
+        <Route path="/admin/search" element={<AdminSearchConfiguration />} />
+        <Route path="/admin/search/*" element={<AdminSearchConfiguration />} />
+        <Route path="/admin/ai/configuration" element={<AdminAIConfiguration />} />
+        <Route path="/admin/ai/configuration/*" element={<AdminAIConfiguration />} />
+        <Route path="/admin/api" element={<AdminAPIWebhooks />} />
+        <Route path="/admin/api/*" element={<AdminAPIWebhooks />} />
+        <Route path="/admin/integrations" element={<AdminIntegrations />} />
+        <Route path="/admin/integrations/*" element={<AdminIntegrations />} />
+        <Route path="/admin/messaging" element={<AdminMessagingPages />} />
+        <Route path="/admin/messaging/*" element={<AdminMessagingPages />} />
+        <Route path="/admin/error-logs" element={<AdminSystemLogs />} />
+        <Route path="/admin/error-logs/*" element={<AdminSystemLogs />} />
+        <Route path="/admin/system-logs" element={<AdminSystemLogs />} />
+        <Route path="/admin/system-logs/*" element={<AdminSystemLogs />} />
+        <Route path="/admin/tax" element={<AdminTaxCommission />} />
+        <Route path="/admin/tax/*" element={<AdminTaxCommission />} />
+        <Route path="/admin/shipping" element={<AdminShippingPages />} />
+        <Route path="/admin/shipping/*" element={<AdminShippingPages />} />
+        <Route path="/admin/payment-settings" element={<AdminPaymentSettings />} />
+        <Route path="/admin/payment-settings/*" element={<AdminPaymentSettings />} />
+        <Route path="/admin/platform-settings" element={<AdminPlatformSettings />} />
+        <Route path="/admin/platform-settings/*" element={<AdminPlatformSettings />} />
+        <Route path="/admin/promotions" element={<AdminMarketingPages type="promotions" />} />
+        <Route path="/admin/promotions/new" element={<AdminMarketingPages type="promotions" create />} />
+        <Route path="/admin/products" element={<AdminProducts />} />
+        <Route path="/admin/products/new" element={<AdminProducts create />} />
+        <Route path="/admin/categories" element={<AdminCategories />} />
+        <Route path="/admin/categories/new" element={<AdminCategories create />} />
+        <Route path="/admin/brands" element={<AdminMarketplacePage type="brands" />} />
+        <Route path="/admin/attributes" element={<AdminMarketplacePage type="attributes" />} />
+        <Route path="/admin/inventory" element={<AdminMarketplacePage type="inventory" />} />
+        <Route path="/admin/product-approvals" element={<AdminMarketplacePage type="approvals" />} />
+        <Route path="/admin/product-reports" element={<AdminMarketplacePage type="reports" />} />
+        <Route path="/admin/sellers" element={<AdminSellerPages type="sellers" />} />
+        <Route path="/admin/sellers/*" element={<AdminSellerPages detail />} />
+        <Route path="/admin/seller-applications" element={<AdminSellerPages type="applications" />} />
+        <Route path="/admin/verification" element={<AdminSellerPages type="verification" />} />
+        <Route path="/admin/seller-performance" element={<AdminSellerPages type="performance" />} />
+        <Route path="/admin/payouts" element={<AdminSellerPages type="payouts" />} />
+        <Route path="/admin/customers" element={<AdminCustomerPages />} />
+        <Route path="/admin/customers/*" element={<AdminCustomerPages detail />} />
+        <Route path="/admin/reviews" element={<AdminCustomerPages type="reviews" />} />
+        <Route path="/admin/complaints" element={<AdminCustomerPages type="complaints" />} />
+        <Route path="/admin/blocked-accounts" element={<AdminCustomerPages type="blocked" />} />
+        <Route path="/admin/orders" element={<AdminOrderPages />} />
+        <Route path="/admin/orders/*" element={<AdminOrderPages detail mode="order" />} />
+        <Route path="/admin/disputes" element={<AdminOrderPages type="disputes" />} />
+        <Route path="/admin/disputes/*" element={<AdminOrderPages detail mode="dispute" />} />
+        <Route path="/admin/returns" element={<AdminOrderPages detail mode="return" />} />
+        <Route path="/admin/returns/*" element={<AdminOrderPages detail mode="return" />} />
+        <Route path="/admin/refunds" element={<AdminOrderPages detail mode="refund" />} />
+        <Route path="/admin/refunds/*" element={<AdminOrderPages detail mode="refund" />} />
+        <Route path="/admin/finances" element={<AdminFinancePages />} />
+        <Route path="/admin/business-analytics" element={<AdminFinancePages type="business" />} />
+        <Route path="/admin/marketplace-analytics" element={<AdminFinancePages type="marketplace" />} />
+        <Route path="/admin/seller-analytics" element={<AdminFinancePages type="seller" />} />
+        <Route path="/admin/customer-analytics" element={<AdminFinancePages type="customer" />} />
+        <Route path="/admin/ai" element={<AdminAIPages type="overview" />} />
+        <Route path="/admin/ai/queries" element={<AdminAIPages type="queries" />} />
+        <Route path="/admin/ai/recommendations" element={<AdminAIPages type="recommendations" />} />
+        <Route path="/admin/ai/comparisons" element={<AdminAIPages type="comparisons" />} />
+        <Route path="/admin/ai/analytics" element={<AdminAIPages type="analytics" />} />
+        <Route path="/admin/users" element={<AdminAdministrationPages type="users" />} />
+        <Route path="/admin/roles" element={<AdminAdministrationPages type="roles" />} />
+        <Route path="/admin/teams" element={<AdminAdministrationPages type="teams" />} />
+        <Route path="/admin/access-control" element={<AdminAdministrationPages type="access" />} />
+        <Route path="/admin/sessions" element={<AdminAdministrationPages type="sessions" />} />
+        <Route path="/admin/activity" element={<AdminAdministrationPages type="activity" />} />
+        <Route path="/admin/audit-logs" element={<AdminAdministrationPages type="audit" />} />
+        <Route path="/admin/flash-sales" element={<AdminMarketingPages type="flash" />} />
+        <Route path="/admin/flash-sales/new" element={<AdminMarketingPages type="flash" create />} />
+        <Route path="/admin/banners" element={<AdminMarketingPages type="banners" />} />
+        <Route path="/admin/banners/new" element={<AdminMarketingPages type="banners" create />} />
+        <Route path="/admin/financial-sections" element={<AdminMarketingPages type="financial" />} />
+        <Route path="/admin/financial-sections/new" element={<AdminMarketingPages type="financial" create />} />
+        <Route path="/admin/campaigns" element={<AdminMarketingPages type="campaigns" />} />
+        <Route path="/admin/campaigns/new" element={<AdminMarketingPages type="campaigns" create />} />
+        <Route path="/admin/coupons" element={<AdminMarketingPages type="coupons" />} />
+        <Route path="/admin/coupons/*" element={<AdminMarketingPages type="coupons" detail />} />
+        <Route path="/admin/stores" element={<AdminStorePages />} />
+        <Route path="/admin/stores/*" element={<AdminStorePages detail />} />
+        <Route path="/admin/store-applications" element={<AdminSellerPages type="applications" />} />
+        <Route path="/admin/error" element={<AdminErrorPage />} />
+        <Route path="/admin/*" element={<AdminPage />} />
+
+        </Route>

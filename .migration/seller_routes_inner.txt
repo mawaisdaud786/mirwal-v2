@@ -1,0 +1,73 @@
+        <Route path="/products/add" element={<SellerAddProduct />} />
+        <Route path="/categories" element={<SellerCatalogPage type="categories" />} />
+        <Route path="/brands" element={<SellerCatalogPage type="brands" />} />
+        <Route path="/products/edit/:id" element={<SellerAddProductEditRoute />} />
+        <Route path="/products/reviews" element={<SellerReviews />} />
+        <Route path="/products" element={<SellerProducts />} />
+        <Route path="/products/*" element={<SellerProducts />} />
+        <Route path="/finance" element={<SellerFinancePage type="overview" />} />
+        <Route path="/finance/overview" element={<SellerFinancePage type="overview" />} />
+        <Route path="/finance/withdrawals" element={<SellerFinancePage type="withdrawals" />} />
+        <Route path="/withdrawals" element={<SellerFinancePage type="withdrawals" />} />
+        <Route path="/finance/settings" element={<SellerFinancePage type="settings" />} />
+        <Route path="/store/payments" element={<SellerFinancePage type="settings" />} />
+        <Route path="/store/profile" element={<SellerStoreProfile page="information" />} />
+        <Route path="/store/information" element={<SellerStoreProfile page="information" />} />
+        <Route path="/store/business" element={<SellerStoreProfile page="business" />} />
+        <Route path="/store/branding" element={<SellerStoreProfile page="branding" />} />
+        <Route path="/store/contact" element={<SellerStoreProfile page="contact" />} />
+        <Route path="/store/policies" element={<SellerStoreProfile page="policies" />} />
+        <Route path="/store/hours" element={<SellerStoreProfile page="hours" />} />
+        <Route path="/store/seo" element={<SellerStoreProfile page="seo" />} />
+        <Route path="/store/preview" element={<SellerStoreProfile page="preview" />} />
+        <Route path="/store/shipping" element={<SellerShippingSettings page="zones" />} />
+        <Route path="/store/shipping/zones" element={<SellerShippingSettings page="zones" />} />
+        <Route path="/store/shipping/methods" element={<SellerShippingSettings page="methods" />} />
+        <Route path="/store/shipping/rates" element={<SellerShippingSettings page="rates" />} />
+        <Route path="/store/shipping/delivery" element={<SellerShippingSettings page="delivery" />} />
+        <Route path="/store/shipping/package" element={<SellerShippingSettings page="package" />} />
+        <Route path="/store/shipping/pickup" element={<SellerShippingSettings page="pickup" />} />
+        <Route path="/store/shipping/providers" element={<SellerShippingSettings page="providers" />} />
+        <Route path="/store/shipping/tracking" element={<SellerShippingSettings page="tracking" />} />
+        <Route path="/store/settings" element={<SellerStoreSettings />} />
+        <Route path="/store/badges" element={<SellerStoreSettings />} />
+        <Route path="/store/social" element={<SellerStoreSettings />} />
+        <Route path="/store/bank" element={<SellerStoreSettings />} />
+        <Route path="/help" element={<SellerHelpCenter />} />
+        <Route path="/notifications" element={<SellerNotifications />} />
+        <Route path="/help/categories" element={<SellerHelpCenter view="categories" />} />
+        <Route path="/help/categories/orders-shipments" element={<SellerHelpCenter view="orders" />} />
+        <Route path="/help/videos" element={<SellerHelpCenter view="videos" />} />
+        <Route path="/help/guides" element={<SellerHelpCenter view="guides" />} />
+        <Route path="/help/guides/*" element={<SellerHelpCenter view="guide-detail" />} />
+        <Route path="/help/articles/*" element={<SellerHelpCenter view="article" />} />
+        <Route path="/help/faqs" element={<SellerHelpCenter view="categories" />} />
+        <Route path="/support" element={<SellerSupport view="overview" />} />
+        <Route path="/support/categories" element={<SellerSupport view="categories" />} />
+        <Route path="/support/requests" element={<SellerSupport view="requests" />} />
+        <Route path="/support/create" element={<SellerSupport view="create" />} />
+        <Route path="/support/request/:id" element={<SellerSupportDetailRoute />} />
+        <Route path="/earnings" element={<SellerFinancePage type="overview" />} />
+        <Route path="/marketing" element={<SellerMarketing view="overview" />} />
+        <Route path="/coupons" element={<SellerMarketing view="coupons" />} />
+        <Route path="/marketing/promotions" element={<SellerMarketing view="promotions" />} />
+        <Route path="/marketing/promotions/create" element={<SellerMarketing view="create-promotion" />} />
+        <Route path="/marketing/discounts" element={<SellerMarketing view="discounts" />} />
+        <Route path="/marketing/discounts/create" element={<SellerMarketing view="create-discount" />} />
+        <Route path="/marketing/coupons" element={<SellerMarketing view="coupons" />} />
+        <Route path="/marketing/coupons/create" element={<SellerMarketing view="create-coupon" />} />
+        <Route path="/marketing/ads" element={<SellerMarketing view="ads" />} />
+        <Route path="/marketing/ads/create" element={<SellerMarketing view="create-ads" />} />
+        <Route path="/marketing/campaigns/create" element={<SellerMarketing view="create-ads" />} />
+        <Route path="/marketing/campaigns" element={<SellerMarketing view="ads" />} />
+        <Route path="/marketing/recommendations" element={<SellerMarketing view="recommendations" />} />
+        <Route path="/marketing/performance" element={<SellerMarketing view="performance" />} />
+        <Route path="/reviews" element={<SellerReviews />} />
+        <Route path="/customers" element={<SellerCustomers />} />
+        <Route path="/orders/returns/:id" element={<SellerReturnsDetailRoute />} />
+        <Route path="/orders/cancelled/:id" element={<SellerCancelledDetailRoute />} />
+        <Route path="/orders/returns" element={<SellerReturnsRefunds key="returns" type="returns" />} />
+        <Route path="/orders/cancelled" element={<SellerReturnsRefunds key="cancellations" type="cancellations" />} />
+        <Route path="/orders" element={<SellerOrders />} />
+        <Route path="/orders/*" element={<SellerOrders />} />
+        <Route path="/*" element={<SellerNotFound />} />

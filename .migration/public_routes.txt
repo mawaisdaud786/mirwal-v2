@@ -1,0 +1,76 @@
+        {/* NO CHROME */}
+        <Route element={<NoChromeLayout />}>
+          <Route path="/login" element={<AuthPage />} />
+          <Route path="/register" element={<AuthPage initialMode="signup" />} />
+        </Route>
+
+        {/* AI ASSISTANT — header without nav, no footer */}
+        <Route element={<PublicLayout cartCount={cartCount} showNav={false} showFooter={false} />}>
+          <Route path="/ai-assistant" element={<AiAssistantPage cartCount={cartCount} onAddToCart={addToCart} />} />
+          <Route path="/ai-shopping" element={<AiAssistantPage cartCount={cartCount} onAddToCart={addToCart} />} />
+        </Route>
+
+        {/* PUBLIC — full chrome */}
+        <Route element={<PublicLayout cartCount={cartCount} />}>
+          <Route path="/" element={<HomePage cartCount={cartCount} cartItems={cartItems} onAddToCart={addToCart} />} />
+          <Route path="/blog" element={<GuidesPage />} />
+          <Route path="/guides" element={<GuidesPage />} />
+          <Route path="/guides/:guideSlug" element={<GuidesPage />} />
+          <Route path="/shopping/:intentSlug" element={<ShoppingIntentPage />} />
+          <Route path="/new-arrivals" element={<ProductListingPage variant="new" cartCount={cartCount} onAddToCart={addToCart} />} />
+          <Route path="/featured" element={<ProductListingPage variant="featured" cartCount={cartCount} onAddToCart={addToCart} />} />
+          <Route element={<RequireRole role="customer" />}>
+            <Route path="/order-success/:orderId" element={<OrderConfirmationPage cartCount={cartCount} />} />
+            <Route path="/pay/:orderId" element={<PayPage cartCount={cartCount} />} />
+            <Route path="/checkout" element={<CheckoutPage cartItems={cartItems} cartCount={cartCount} onOrderPlaced={clearCart} />} />
+          </Route>
+          <Route path="/help-center" element={<HelpCenterPage cartCount={cartCount} />} />
+          <Route path="/about" element={<AboutUsPage />} />
+          <Route path="/contact" element={<TrustRoute pageKey="contact" />} />
+          <Route path="/faq" element={<TrustRoute pageKey="faq" />} />
+          <Route path="/shipping" element={<TrustRoute pageKey="shipping" />} />
+          <Route path="/returns" element={<ContentPage page="returns" />} />
+          <Route path="/privacy" element={<TrustRoute pageKey="privacy" />} />
+          <Route path="/terms" element={<TrustRoute pageKey="terms" />} />
+          <Route path="/how-mirwal-works" element={<TrustRoute pageKey="how-mirwal-works" />} />
+          <Route path="/buyer-protection" element={<TrustRoute pageKey="buyer-protection" />} />
+          <Route path="/safe-shopping" element={<TrustRoute pageKey="safe-shopping" />} />
+          <Route path="/seller-verification" element={<TrustRoute pageKey="seller-verification" />} />
+          <Route path="/seller-protection" element={<TrustRoute pageKey="seller-protection" />} />
+          <Route path="/payment-security" element={<TrustRoute pageKey="payment-security" />} />
+          <Route path="/returns-refunds" element={<TrustRoute pageKey="returns-refunds" />} />
+          <Route path="/order-tracking" element={<TrustRoute pageKey="order-tracking" />} />
+          <Route path="/cookies" element={<TrustRoute pageKey="cookies" />} />
+          <Route path="/trust-safety" element={<TrustRoute pageKey="trust-safety" />} />
+          <Route path="/help" element={<HelpCenterPage cartCount={cartCount} />} />
+          <Route path="/report-problem" element={<ReportPage />} />
+          <Route path="/report" element={<ReportPage />} />
+          <Route path="/brands" element={<DiscoveryPage type="brands" />} />
+          <Route path="/brands/:slug" element={<DiscoveryPage type="brands" />} />
+          <Route path="/brand/:brandSlug/:categorySlug" element={<DiscoveryPage type="brands" />} />
+          <Route path="/brand/:brandSlug" element={<DiscoveryPage type="brands" />} />
+          <Route path="/categories" element={<CategoriesPage cartCount={cartCount} onAddToCart={addToCart} />} />
+          <Route path="/categories/:slug" element={<CategoriesPage cartCount={cartCount} onAddToCart={addToCart} />} />
+          <Route path="/category/:slug" element={<CategoriesPage cartCount={cartCount} onAddToCart={addToCart} />} />
+          <Route path="/sellers" element={<SellerPages listing cartCount={cartCount} onAddToCart={addToCart} />} />
+          <Route path="/seller/:sellerSlug/:categorySlug" element={<SellerPages cartCount={cartCount} onAddToCart={addToCart} />} />
+          <Route path="/seller/:sellerSlug" element={<SellerPages cartCount={cartCount} onAddToCart={addToCart} />} />
+          {accountPaths.map((p) => <Route key={p} path={p} element={<PrivateAccountRoute path={p} cartCount={cartCount} onAddToCart={addToCart} />} />)}
+          <Route path="/cart" element={<CartPage cartItems={cartItems} cartCount={cartCount} onChangeQuantity={changeQuantity} onRemove={removeFromCart} onAddToCart={addToCart} onCheckout={checkout} />} />
+          <Route path="/deals" element={<DealsPage cartCount={cartCount} onAddToCart={addToCart} />} />
+          <Route path="/deals/:dealSlug" element={<DealPage />} />
+          <Route path="/compare" element={<ComparePage cartCount={cartCount} onAddToCart={addToCart} />} />
+          <Route path="/sell-with-mirwal/apply" element={<SellerFormPage />} />
+          <Route path="/sell-with-mirwal" element={<SellerPage />} />
+          <Route path="/stores/awais-store" element={<StorePage cartCount={cartCount} onAddToCart={addToCart} />} />
+          <Route path="/store" element={<StorePage cartCount={cartCount} onAddToCart={addToCart} />} />
+          <Route path="/explore" element={<ExploreRoute cartCount={cartCount} onAddToCart={addToCart} />} />
+          <Route path="/search" element={<SearchResultsPage cartCount={cartCount} onAddToCart={addToCart} />} />
+          <Route path="/products" element={<ProductsPage cartCount={cartCount} onAddToCart={addToCart} />} />
+          <Route path="/products/:id" element={<ProductPageRoute cartCount={cartCount} onAddToCart={addToCart} />} />
+          <Route path="/product/:productSlug" element={<ProductPageRoute cartCount={cartCount} onAddToCart={addToCart} />} />
+          <Route path="/404" element={<NotFoundPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+      </Routes>
+    </ComparisonProvider></WishlistProvider></SessionProvider></Suspense></PageErrorBoundary>

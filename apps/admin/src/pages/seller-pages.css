@@ -1,0 +1,153 @@
+/* ============================================================================
+   Admin Sellers list + detail — real data (GET /sellers, GET /sellers/:slug,
+   GET /products?seller=). Same premium spacing pass as the other admin pages.
+   ============================================================================ */
+
+.seller-page, .seller-detail { display: flex; flex-direction: column; gap: 18px; max-width: 1280px; margin: auto; }
+.seller-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.seller-heading h1 { margin: 0; font: 800 24px var(--font-heading); }
+.seller-heading p { display: flex; align-items: center; gap: 7px; margin: 5px 0 0; color: var(--admin-text-muted); font-size: 13px; }
+.seller-heading p i { font-size: 10px; }
+.seller-heading > button, .seller-heading > div > button { display: flex; align-items: center; gap: 7px; padding: 10px 14px; border: 1px solid var(--admin-border); border-radius: var(--radius-lg); color: var(--admin-text-secondary); background: var(--color-surface); font-size: 13px; font-weight: 600; }
+.seller-heading > button.primary { border-color: var(--color-primary); color: #fff; background: var(--color-primary); }
+.seller-heading button:disabled { cursor: not-allowed; opacity: .55; }
+
+.seller-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 260px)); gap: 14px; }
+.seller-kpis article { position: relative; min-height: 92px; padding: 16px; border: 1px solid var(--admin-border); border-radius: var(--radius-2xl); background: var(--color-surface); box-shadow: var(--admin-shadow-card); }
+.seller-kpi-icon { position: absolute; top: 16px; right: 16px; display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--radius-xl); color: var(--color-primary); background: #fff0e8; font-size: 15px; }
+.seller-kpi-icon.tone-1 { color: var(--admin-success); background: var(--admin-success-light); }
+.seller-kpi-icon.tone-2 { color: #ee9512; background: var(--admin-warning-light); }
+.seller-kpi-icon.tone-3 { color: var(--admin-danger); background: var(--admin-danger-light); }
+.seller-kpis small { display: block; color: var(--admin-text-secondary); font-size: 13px; font-weight: 600; }
+.seller-kpis strong { display: block; margin-top: 10px; font: 800 26px var(--font-heading); }
+
+.seller-panel, .seller-profile-card { padding: 18px; border: 1px solid var(--admin-border); border-radius: var(--radius-2xl); background: var(--color-surface); box-shadow: var(--admin-shadow-card); }
+.seller-panel h2 { margin: 0 0 13px; font: 800 15px var(--font-heading); }
+
+.seller-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 16px; }
+.seller-filters label { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 220px; height: 40px; padding: 0 13px; border: 1px solid var(--admin-border); border-radius: var(--radius-pill); color: var(--admin-text-muted); background: var(--admin-surface-muted); transition: border-color var(--transition-fast); }
+.seller-filters label:focus-within { border-color: var(--color-primary); background: var(--color-surface); box-shadow: 0 0 0 3px var(--color-primary-light); }
+.seller-filters input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: var(--color-text); font-size: 13.5px; }
+.seller-filters button { display: flex; align-items: center; gap: 7px; height: 40px; padding: 0 14px; border: 1px solid var(--admin-border); border-radius: var(--radius-lg); color: var(--admin-text-secondary); background: var(--color-surface); font-size: 13px; font-weight: 600; }
+.seller-filters button:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+.seller-table-wrap { overflow: auto; border: 1px solid var(--admin-border-light); border-radius: var(--radius-xl); }
+.seller-table { width: 100%; min-width: 700px; border-collapse: collapse; color: var(--color-text); font-size: 13.5px; }
+.seller-table th { padding: 0 14px; height: 42px; border-bottom: 1px solid var(--admin-border); background: var(--admin-surface-muted); color: var(--admin-text-secondary); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; text-align: left; }
+.seller-table td { padding: 12px 14px; border-bottom: 1px solid var(--admin-border-light); white-space: nowrap; }
+.seller-table tbody tr:last-child td { border-bottom: 0; }
+.seller-table tbody tr:hover { background: var(--admin-surface-muted); }
+.seller-link { padding: 0; border: 0; color: var(--color-text); background: none; font-size: inherit; font-weight: 700; }
+.seller-link:hover { color: var(--color-primary); text-decoration: underline; }
+.seller-table td > button { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--admin-border); border-radius: var(--radius-md); color: var(--admin-text-secondary); background: var(--color-surface); }
+.seller-table td > button:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+.seller-status { display: inline-block; padding: 5px 10px; border-radius: var(--radius-pill); color: var(--admin-success); background: var(--admin-success-light); font-size: 12px; font-weight: 700; }
+.seller-status.pending { color: #e58a0c; background: var(--admin-warning-light); }
+.seller-status.rejected, .seller-status.suspended { color: var(--admin-danger); background: var(--admin-danger-light); }
+.seller-status.paid, .seller-status.verified, .seller-status.approved { color: var(--admin-success); background: var(--admin-success-light); }
+
+.seller-footer { display: flex; align-items: center; justify-content: space-between; padding-top: 14px; color: var(--admin-text-muted); font-size: 12.5px; }
+
+/* ---- Seller detail ---- */
+.seller-profile-card { display: grid; grid-template-columns: 64px 1fr auto; gap: 18px; align-items: center; }
+.seller-avatar { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; color: #fff; background: #bd8050; font: 800 24px var(--font-heading); }
+.seller-profile-card h2 { display: flex; align-items: center; gap: 10px; margin: 0; font: 800 20px var(--font-heading); }
+.seller-profile-card p, .seller-profile-card small { display: block; margin: 4px 0 0; color: var(--admin-text-secondary); font-size: 13px; }
+.seller-profile-card dl { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin: 0; }
+.seller-profile-card dt { color: var(--admin-text-muted); font-size: 12px; font-weight: 600; }
+.seller-profile-card dd { margin: 5px 0 0; font: 800 18px var(--font-heading); }
+.seller-description { margin: 0; padding: 16px; border: 1px solid var(--admin-border-light); border-radius: var(--radius-xl); background: var(--admin-surface-muted); color: var(--admin-text-secondary); font-size: 13px; line-height: 1.6; }
+
+.seller-detail-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 14px; }
+.detail-columns p { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; margin: 0; border-bottom: 1px solid var(--admin-border-light); font-size: 13px; }
+.detail-columns p:last-child { border-bottom: 0; }
+.detail-columns p b { color: var(--color-text); font-weight: 600; }
+.detail-columns p span { color: var(--admin-success); font-weight: 600; }
+
+/* ---- Moderation UI: status tabs, row actions, result flash, reason banner ---- */
+.seller-tabs { display: flex; gap: 18px; margin-bottom: 14px; border-bottom: 1px solid var(--admin-border); overflow-x: auto; }
+.seller-tabs button { display: flex; align-items: center; gap: 6px; padding: 8px 0; border: 0; border-bottom: 2px solid transparent; color: var(--admin-text-muted); background: transparent; white-space: nowrap; font-size: 13px; }
+.seller-tabs button.active { color: var(--color-primary); border-color: var(--color-primary); font-weight: 700; }
+.seller-tabs em { padding: 1px 7px; border-radius: var(--radius-pill); background: var(--admin-surface-muted); font-style: normal; font-size: 11px; }
+.seller-tabs button.active em { color: var(--color-primary); background: var(--color-primary-light); }
+
+.seller-actions { display: flex; gap: 8px; }
+.seller-row-actions { display: flex; gap: 6px; align-items: center; }
+.seller-row-actions button { display: flex; align-items: center; gap: 5px; padding: 5px 10px; border: 1px solid var(--admin-border); border-radius: 5px; color: var(--admin-text-secondary); background: #fff; font-size: 12px; font-weight: 600; }
+.seller-row-actions .approve { color: var(--admin-success); border-color: var(--admin-success-light); background: var(--admin-success-light); }
+.seller-row-actions .reject { color: var(--admin-danger); border-color: var(--admin-danger-light); background: var(--admin-danger-light); }
+.seller-row-actions button:disabled { opacity: .55; }
+
+/* The outcome of a moderation action. Previously these pages showed a success message with
+   nothing behind it, so this only ever renders from a real server response. */
+.seller-flash { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; padding: 9px 12px; border-radius: 6px; font-size: 13px; }
+.seller-flash.success { color: var(--admin-success); background: var(--admin-success-light); }
+.seller-flash.error { color: var(--admin-danger); background: var(--admin-danger-light); }
+.seller-error-note { margin: 0 0 8px; color: var(--admin-danger); font-size: 13px; }
+
+.seller-reason { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 11px 13px; border-radius: 6px; color: var(--admin-danger); background: var(--admin-danger-light); font-size: 13px; }
+
+.seller-breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 12px; }
+.seller-breakdown dt { color: var(--admin-text-muted); font-size: 12px; }
+.seller-breakdown dd { margin: 2px 0 0; font: 700 16px var(--font-heading); }
+
+.seller-table td small { display: block; margin-top: 2px; color: var(--admin-text-muted); font-size: 11px; }
+.seller-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.seller-footer div { display: flex; gap: 6px; }
+.seller-footer button { display: flex; align-items: center; gap: 5px; padding: 5px 10px; border: 1px solid var(--admin-border); border-radius: 5px; color: var(--admin-text-secondary); background: #fff; font-size: 12px; }
+.seller-footer button:disabled { opacity: .5; }
+
+/* ---- Payout statuses and table extras ---- */
+.seller-status.requested { color: #bc7600; background: var(--admin-warning-light); }
+.seller-status.processing { color: #6847c7; background: var(--admin-info-light); }
+.seller-status.failed { color: var(--admin-danger); background: var(--admin-danger-light); }
+.seller-table code { padding: 2px 6px; border-radius: 4px; background: var(--admin-surface-muted); font-family: var(--font-mono, monospace); font-size: 12px; }
+.seller-muted { color: var(--admin-text-muted); }
+.seller-footnote { margin: 12px 0 0; color: var(--admin-text-muted); font-size: 12px; line-height: 1.5; }
+
+/* ---- Verification document viewer ---- */
+.doc-viewer { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: rgba(15, 20, 26, .72); }
+.doc-viewer-inner { display: flex; flex-direction: column; gap: 12px; width: min(820px, 100%); max-height: 90vh; padding: 16px; border-radius: 12px; background: #fff; }
+.doc-viewer-inner header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.doc-viewer-inner header strong { display: block; font-size: 16px; }
+.doc-viewer-inner header small { display: block; margin-top: 2px; color: var(--admin-text-muted); font-size: 12px; }
+.doc-viewer-inner header button { padding: 6px 10px; border: 1px solid var(--admin-border); border-radius: 6px; background: #fff; }
+.doc-viewer-inner img, .doc-viewer-inner iframe { width: 100%; flex: 1; min-height: 340px; border: 1px solid var(--admin-border); border-radius: 8px; object-fit: contain; background: var(--admin-surface-muted); }
+.doc-viewer-inner footer { display: flex; gap: 9px; justify-content: flex-end; }
+.doc-viewer-inner footer button { padding: 9px 16px; border: 1px solid var(--admin-border); border-radius: 6px; background: #fff; font-size: 13px; font-weight: 600; }
+.doc-viewer-inner footer .approve { color: var(--admin-success); border-color: var(--admin-success-light); background: var(--admin-success-light); }
+.doc-viewer-inner footer .reject { color: var(--admin-danger); border-color: var(--admin-danger-light); background: var(--admin-danger-light); }
+.seller-status.pending { color: #bc7600; background: var(--admin-warning-light); }
+
+@media (max-width: 900px) {
+  .seller-detail-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 650px) {
+  .seller-heading { display: block; }
+  .seller-heading > button, .seller-heading > div { margin-top: 10px; }
+  .seller-panel, .seller-profile-card { padding: 14px; }
+  .seller-profile-card { grid-template-columns: 48px 1fr; }
+  .seller-avatar { width: 48px; height: 48px; font-size: 18px; }
+  .seller-profile-card dl { grid-column: span 2; margin-top: 10px; }
+}
+
+/* ============================================================================
+   Store detail — real orders and reviews, replacing a not-connected panel.
+   ============================================================================ */
+
+.store-totals { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; margin: 0 0 14px; }
+.store-totals > div { padding: 9px 11px; border: 1px solid var(--admin-border-light); border-radius: 7px; }
+.store-totals dt { color: var(--admin-text-muted); font-size: var(--font-size-md); }
+.store-totals dd { margin: 3px 0 0; font: 800 17px var(--font-heading); }
+
+.store-subhead { margin: 16px 0 8px; color: var(--admin-text-muted); font: 700 var(--font-size-lg) var(--font-heading); text-transform: uppercase; letter-spacing: .04em; }
+.store-note { margin: 0; color: var(--admin-text-muted); font-size: var(--font-size-lg); }
+
+.store-list p { display: grid; gap: 2px; margin: 0; padding: 9px 0; border-bottom: 1px solid var(--admin-border-light); }
+.store-list p:last-child { border-bottom: 0; }
+.store-list b { color: var(--admin-text); font-size: var(--font-size-lg); }
+.store-list span { color: var(--admin-text-secondary); font-size: var(--font-size-md); line-height: 1.5; }
+.store-list em { color: var(--admin-text-muted); font-size: var(--font-size-md); font-style: normal; }
+
+@media (max-width: 600px) { .store-totals { grid-template-columns: 1fr; } }

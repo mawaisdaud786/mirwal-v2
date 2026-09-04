@@ -1,0 +1,16 @@
+{
+  "name": "@mirwal/shared",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Low-level utilities shared by the storefront, admin and seller applications. Deliberately contains NO application-specific UI — no dashboards, no account pages, no panel layouts. Anything that belongs to one application lives in that application.",
+  "exports": {
+    "./apiClient": "./src/apiClient.js",
+    "./useApiQuery": "./src/useApiQuery.js",
+    "./navigation": "./src/navigation.js",
+    "./Icon": "./src/Icon.jsx",
+    "./money": "./src/money.js",
+    "./PageStates": "./src/PageStates.jsx",
+    "./styles/global.css": "./src/styles/global.css"
+  }
+}

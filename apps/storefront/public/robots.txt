@@ -1,0 +1,49 @@
+# Mirwal — https://mirwal.com
+# Crawl policy mirrors src/seo/routeMeta.js. Keep the two in sync.
+
+User-agent: *
+
+# Back-office surfaces. Never indexable.
+Disallow: /admin
+Disallow: /seller/products
+Disallow: /seller/orders
+Disallow: /seller/finance
+Disallow: /seller/store
+Disallow: /seller/marketing
+Disallow: /seller/customers
+Disallow: /seller/reviews
+Disallow: /seller/support
+Disallow: /seller/help
+Disallow: /seller/notifications
+Disallow: /seller/earnings
+Disallow: /seller/withdrawals
+Disallow: /seller/coupons
+
+# Account and transaction pages. Private to the signed-in customer.
+Disallow: /profile
+Disallow: /orders
+Disallow: /track-orders
+Disallow: /wishlist
+Disallow: /recently-viewed
+Disallow: /saved-searches
+Disallow: /addresses
+Disallow: /payment-methods
+Disallow: /notifications
+Disallow: /security
+Disallow: /settings
+Disallow: /logout
+Disallow: /my-chats
+Disallow: /cart
+Disallow: /checkout
+Disallow: /order-success
+
+# Auth.
+Disallow: /login
+Disallow: /register
+
+# Search result pages: crawlable for link discovery, not worth indexing.
+Disallow: /search
+
+Allow: /
+
+Sitemap: https://mirwal.com/sitemap.xml

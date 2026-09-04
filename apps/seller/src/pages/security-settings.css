@@ -1,0 +1,76 @@
+/* ============================================================================
+   Seller account security — password, two-factor, signed-in devices.
+   ============================================================================ */
+
+.security-settings-page { display: flex; flex-direction: column; gap: 14px; max-width: 900px; }
+.security-settings-header h1 { margin: 0; font: 800 24px var(--font-heading); }
+.security-settings-header p { margin: 5px 0 0; max-width: 74ch; color: var(--color-text-secondary); font-size: 14px; line-height: 1.55; }
+
+.sec-card { padding: 18px; border: 1px solid var(--color-border); border-radius: 10px; background: #fff; }
+.sec-card-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+.sec-card-head > span { display: grid; place-items: center; flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; color: var(--color-primary); background: var(--color-primary-light); }
+.sec-card-head > div { flex: 1; }
+.sec-card-head h2 { margin: 0; font: 800 16px var(--font-heading); }
+.sec-card-head p { margin: 4px 0 0; max-width: 72ch; color: var(--color-text-secondary); font-size: 13px; line-height: 1.6; }
+.sec-card-head em { flex-shrink: 0; padding: 4px 11px; border-radius: var(--radius-pill, 999px); font-size: 12px; font-style: normal; font-weight: 700; }
+.sec-card-head em.on { color: var(--color-success-dark); background: var(--color-success-light); }
+.sec-card-head em.off { color: var(--color-text-muted); background: var(--color-surface-soft, #f1f3f5); }
+
+.sec-note { margin: 0 0 12px; max-width: 74ch; color: var(--color-text-secondary); font-size: 13px; line-height: 1.6; }
+
+.sec-form { display: flex; flex-direction: column; gap: 11px; max-width: 420px; }
+.sec-form.inline { flex-direction: row; align-items: center; max-width: none; }
+.sec-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; }
+.sec-form label small { color: var(--color-text-muted); font-weight: 400; line-height: 1.5; }
+.sec-form input { padding: 9px 11px; border: 1px solid var(--color-border); border-radius: 7px; background: #fff; font: 13px var(--font-body); }
+.sec-form input:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+.sec-form.inline input { width: 140px; font: 700 17px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 3px; text-align: center; }
+
+.sec-form button,
+.sec-actions button,
+.security-settings-page > .sec-card > button {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sec-form button.primary,
+.security-settings-page > .sec-card > button.primary,
+.sec-codes button.primary { border-color: transparent; background: var(--color-primary); color: #fff; }
+.sec-actions button.danger { color: var(--color-danger); border-color: #ffb1a9; }
+.sec-form button:disabled, .sec-actions button:disabled { opacity: .55; cursor: default; }
+.sec-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.sec-secret { display: inline-block; margin: 0 0 12px; padding: 10px 14px; border: 1px dashed var(--color-border); border-radius: 7px; background: var(--color-surface-soft, #f7f8fa); font: 700 15px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 1px; user-select: all; }
+
+.sec-sessions { margin: 0; padding: 0; list-style: none; }
+.sec-sessions li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--color-border-light, #eef0f2); }
+.sec-sessions li:first-child { border-top: 0; }
+.sec-sessions b { display: block; font-size: 13px; word-break: break-word; }
+.sec-sessions b em { margin-left: 7px; padding: 2px 7px; border-radius: 4px; color: var(--color-success-dark); background: var(--color-success-light); font-size: 11px; font-style: normal; }
+.sec-sessions small { display: block; margin-top: 3px; color: var(--color-text-muted); font-size: 12px; }
+.sec-sessions button { flex-shrink: 0; padding: 6px 12px; border: 1px solid var(--color-border); border-radius: 6px; background: #fff; font-size: 12px; }
+
+.sec-flash { display: flex; align-items: center; gap: 9px; margin: 0; padding: 11px 14px; border-radius: 8px; font-size: 14px; }
+.sec-flash.success { color: var(--color-success-dark); background: var(--color-success-light); }
+.sec-flash.error { color: var(--color-danger); background: #fdecea; }
+
+.sec-codes { border-color: var(--color-success); background: var(--color-success-light); }
+.sec-codes h2 { display: flex; align-items: center; gap: 8px; margin: 0; font: 800 16px var(--font-heading); }
+.sec-codes p { margin: 6px 0 12px; max-width: 74ch; color: var(--color-success-dark); font-size: 13px; line-height: 1.6; }
+.sec-codes ol { display: grid; grid-template-columns: repeat(2, max-content); gap: 6px 30px; margin: 0 0 14px; padding-left: 22px; }
+.sec-codes code { font: 700 14px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .5px; user-select: all; }
+
+@media (max-width: 640px) {
+  .sec-card-head { flex-wrap: wrap; }
+  .sec-codes ol { grid-template-columns: 1fr; }
+  .sec-form.inline { flex-wrap: wrap; }
+}

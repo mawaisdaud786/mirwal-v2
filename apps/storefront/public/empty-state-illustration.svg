@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" role="img" aria-labelledby="title desc">
+  <title id="title">Nothing to show</title>
+  <desc id="desc">A soft orange marketplace package illustration</desc>
+  <rect width="320" height="180" rx="24" fill="#fff8f2"/>
+  <path d="M52 121h216" stroke="#eadbd2" stroke-width="3" stroke-linecap="round"/>
+  <path d="M102 76h112l14 20v35H88V96z" fill="#f6b37e"/>
+  <path d="M102 76l56 24 56-24" fill="#ffd5b1"/>
+  <path d="M158 100v31" stroke="#ed7c3d" stroke-width="3"/>
+  <path d="M118 62h80l16 14h-112z" fill="#ff8a4c"/>
+  <circle cx="222" cy="64" r="27" fill="#fff" stroke="#6e6763" stroke-width="7"/>
+  <path d="M242 84l24 24" stroke="#6e6763" stroke-width="9" stroke-linecap="round"/>
+  <circle cx="74" cy="62" r="13" fill="#f1e9e4"/><circle cx="92" cy="62" r="18" fill="#f1e9e4"/><circle cx="112" cy="62" r="11" fill="#f1e9e4"/>
+  <path d="M64 77h56" stroke="#f1e9e4" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="268" cy="42" r="4" fill="#ff641b"/><circle cx="47" cy="103" r="4" fill="#ffb27d"/>
+</svg>

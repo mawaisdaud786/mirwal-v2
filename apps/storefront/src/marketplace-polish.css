@@ -1,0 +1,228 @@
+.product-detail { max-width: 1240px; }
+.detail-main { grid-template-columns: minmax(0, 1.05fr) minmax(320px, .95fr); gap: 28px 34px; align-items: start; }
+.gallery { grid-row: 1 / span 2; min-height: 480px; }
+.detail-copy { grid-column: 2; grid-row: 1; padding-top: 10px; }
+.buy-panel { grid-column: 2; grid-row: 2; position: sticky; top: 18px; }
+.main-image { min-height: 460px; border: 1px solid #f1dfd3; background: #fffaf6; }
+.main-image img { width: 88%; height: 88%; }
+.detail-copy h1 { max-width: 620px; margin-top: 10px; font-size: clamp(26px, 2.4vw, 34px); letter-spacing: 0; }
+.product-brand-label { display: block; margin-top: 12px; color: var(--color-text-secondary); font-size:14px; }
+.detail-price strong { font-size:28px; }
+.buy-primary { min-height: 44px; font-size:15px; box-shadow: 0 7px 16px #ff641b2e; }
+.detail-tabs { position: sticky; top: 0; z-index: 2; background: #fff; }
+
+/* The rules above place the buy panel at column 2 / row 2, i.e. stacked under the copy. That
+   was written for the 2-column .detail-main on line 2 — but App.css loads after this file and
+   wins with a 3-column template, so the panel stayed in column 2 and column 3 was left empty:
+   a dead ~290px gutter down the right of every product page.
+   Above 1100px there is room to use it, so the panel moves into column 3 beside the copy, where
+   its existing `position:sticky` finally does something (it now has a tall gallery to track).
+   Below 1100px App.css already spans the panel full-width under a 2-column grid, which is the
+   right call at those widths — so this only engages where the third column actually fits. */
+@media (min-width: 1101px) {
+  .detail-main { align-items: start; }
+  .gallery { grid-row: 1; }
+  .buy-panel { grid-column: 3; grid-row: 1; }
+}
+
+/* 801–1100px: App.css spans .buy-panel across both columns on row 2 here. That collides with
+   the base `.gallery { grid-row: 1 / span 2 }` — with row 2 of column 1 occupied, the gallery
+   could not fit its 2-row span in column 1, so it was pushed into a narrow *implicit* third
+   column and rendered as a ~196px strip on the right while the copy sat to its left. Pinning
+   the gallery to a single cell restores the intended gallery | copy pair. */
+@media (min-width: 801px) and (max-width: 1100px) {
+  .gallery { grid-row: 1; grid-column: 1; }
+  .detail-copy { grid-column: 2; grid-row: 1; }
+}
+
+/* Cart: the suggestions now live in the left column beside the order summary, rather than in a
+   full-width band under the whole layout. With one or two items the cart list is ~250px tall
+   next to a ~750px summary, so the left column was mostly dead space while the content that
+   could fill it sat below the fold. Moving it up uses that space instead of padding it out.
+   auto-fit (not auto-fill) is what makes the same grid work in both places: empty tracks
+   collapse, so the five cards stretch to fill whatever width the column happens to be. */
+.cart-main { display: flex; min-width: 0; flex-direction: column; }
+.cart-main .cart-recommendations { margin-top: 24px; }
+.cart-product-grid { grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); }
+
+/* Below 1100px .cart-layout collapses to one column, and nesting the suggestions inside
+   .cart-main would then push the order summary — and the checkout button — beneath five
+   product cards. `display: contents` drops the wrapper's box so its children become grid items
+   of .cart-layout directly, which lets the summary be ordered back above the suggestions.
+   The wrapper only exists to form the left column, so it has nothing of its own to lose. */
+@media (max-width: 1100px) {
+  .cart-main { display: contents; }
+  .cart-list { order: 1; }
+  .order-summary { order: 2; }
+  .cart-main .cart-recommendations { order: 3; margin-top: 8px; }
+}
+
+/* Availability states. `.stock` alone stays the in-stock green from App.css; these two carry
+   the colour for the states that are not good news. Two classes deep, so they win on
+   specificity regardless of stylesheet order. */
+.stock.is-out { color: var(--color-danger); }
+.stock.is-out span { background: var(--color-danger); }
+.stock.is-low { color: var(--color-accent); }
+.stock.is-low span { background: var(--color-accent); }
+
+.search-results-heading h1,.listing-heading h1,.category-header h1 { max-width: 760px; letter-spacing: 0; }
+.search-product-card,.listing-card,.category-product-card { transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+.search-product-card:hover,.listing-card:hover,.category-product-card:hover { transform: translateY(-3px); border-color: #efbd9d; box-shadow: 0 10px 24px #6c351615; }
+.search-product-body h2,.listing-card-body h2,.category-product-content h3 { min-height: 2.5em; line-height: 1.25; }
+.search-product-body>div,.listing-card-body>div,.category-product-actions { min-height: 34px; }
+.search-results-content,.category-shopping-layout { min-width: 0; }
+
+@media (max-width: 900px) {
+  .detail-main { grid-template-columns: minmax(0, 1fr) minmax(280px, .9fr); gap: 20px; }
+  .gallery { min-height: 390px; }
+  .main-image { min-height: 390px; }
+}
+
+@media (max-width: 800px) {
+  .detail-main { display: grid; grid-template-columns: 1fr; }
+  .gallery,.detail-copy,.buy-panel { grid-column: 1; grid-row: auto; }
+  .gallery { min-height: 330px; }
+  .main-image { min-height: 330px; }
+  .buy-panel { position: static; }
+  .detail-tabs { position: static; }
+  .search-results-heading,.listing-heading,.category-header { border-radius: 8px; }
+}
+
+@media (max-width: 480px) {
+  .search-product-grid,.listing-grid,.category-product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .search-product-body h2,.listing-card-body h2,.category-product-content h3 { min-height: 3.75em; font-size:14px; }
+  .search-product-media,.listing-image,.category-product-media { height: 132px; }
+  .search-product-body,.listing-card-body,.category-product-content { padding: 8px; }
+  .search-product-body>div,.listing-card-body>div,.category-product-actions { min-height: 0; }
+}
+
+@media (max-width: 800px) {
+  .compare-page .comparison-content { overflow: visible; }
+  .compare-page .compare-cards,.compare-page .compare-cards-2,.compare-page .compare-cards-3,.compare-page .compare-cards-4 { min-width: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .compare-page .compare-card-spacer { display: none; }
+  .compare-page .feature-table-wrap { max-width: 100%; overflow-x: auto; }
+  .compare-page .feature-table { min-width: 560px; }
+}
+
+.deal-clock { display: none; }
+
+/* Shared marketplace visual language for existing page-specific components. */
+.search-product-card,
+.listing-card,
+.category-product-card,
+.deal-product-card,
+.product-card {
+  border-color: #eee0d7;
+  border-radius: 7px;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.search-product-card:hover,
+.listing-card:hover,
+.category-product-card:hover,
+.deal-product-card:hover,
+.product-card:hover {
+  transform: translateY(-3px);
+  border-color: #efbd9d;
+  box-shadow: 0 10px 24px rgba(108, 53, 22, .08);
+}
+.search-product-media > span,
+.listing-image > span,
+.category-product-media > span,
+.deal-product-card > label,
+.product-card > label {
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.search-results-heading h1,
+.listing-heading h1,
+.category-header h1,
+.deals-heading h1,
+.section-heading h2 {
+  letter-spacing: 0;
+}
+.category-controls select,
+.listing-toolbar select,
+.search-results-toolbar select,
+.deals-toolbar select {
+  border: 1px solid #e7d9d0;
+  border-radius: 8px;
+  background: #fffaf6;
+  color: #3f3028;
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+.category-controls select:focus,
+.listing-toolbar select:focus,
+.search-results-toolbar select:focus,
+.deals-toolbar select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-light);
+  outline: 0;
+}
+
+.search-product-media,
+.listing-image,
+.category-product-media,
+.deal-product-card > img {
+  height: 170px;
+  background: #fcf9f7;
+}
+.search-product-media img,
+.listing-image img,
+.category-product-media img,
+.deal-product-card > img {
+  width: 100%;
+  height: 100%;
+  padding: 12px;
+  object-fit: contain;
+}
+.search-product-body,
+.listing-card-body,
+.category-product-content {
+  padding: 10px;
+}
+.search-product-body h2,
+.listing-card-body h2,
+.category-product-content h3,
+.deal-product-card h3 {
+  margin: 4px 0;
+  color: #33251f;
+  font: 700 15px/1.3 var(--font-heading);
+}
+.search-product-body > p,
+.listing-card-body > p,
+.category-product-content > p,
+.deal-product-card .deal-rating {
+  color: #b66b39;
+  font-size: 13px;
+}
+.search-product-body > strong,
+.listing-card-body > strong,
+.category-product-content > strong,
+.deal-product-card > strong {
+  font-size: 16px;
+}
+.search-product-media > span,
+.listing-image > span,
+.category-product-media > span,
+.deal-product-card > label,
+.product-card > label {
+  padding: 4px 6px;
+  border-radius: 3px;
+  background: #ffe4e8;
+  color: #c73755;
+}
+
+@media (max-width: 480px) {
+  .search-product-media,
+  .listing-image,
+  .category-product-media,
+  .deal-product-card > img {
+    height: 125px;
+  }
+  .search-product-body,
+  .listing-card-body,
+  .category-product-content {
+    padding: 10px;
+  }
+}

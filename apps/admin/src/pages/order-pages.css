@@ -1,0 +1,129 @@
+/* ============================================================================
+   Admin Orders, Order Detail & Disputes — all real (server/src/modules/admin),
+   all sharing the generic Heading/Kpis/Filters/Table components from
+   AdminComponents.jsx with section="order". Rewritten for the same premium
+   spacing as products.css: sticky-feeling generous rows, clear type scale,
+   soft shadows, instead of 7-8px padding and 12px fonts.
+   ============================================================================ */
+
+.order-page { display: flex; flex-direction: column; gap: 18px; max-width: 1280px; margin: auto; }
+
+.order-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.order-heading h1 { margin: 0; font: 800 24px var(--font-heading); }
+.order-heading p { display: flex; align-items: center; gap: 7px; margin: 5px 0 0; color: var(--admin-text-muted); font-size: 13px; }
+.order-heading p i { font-size: 10px; }
+.order-heading button { display: flex; align-items: center; gap: 7px; padding: 10px 14px; border: 1px solid var(--admin-border); border-radius: var(--radius-lg); color: var(--admin-text-secondary); background: var(--color-surface); font-size: 13px; font-weight: 600; }
+.order-heading button.primary { border-color: var(--color-primary); color: #fff; background: var(--color-primary); }
+
+.order-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.order-kpis article { position: relative; min-height: 92px; padding: 16px; border: 1px solid var(--admin-border); border-radius: var(--radius-2xl); background: var(--color-surface); box-shadow: var(--admin-shadow-card); }
+.order-kpi-icon { position: absolute; top: 16px; right: 16px; display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--radius-xl); color: var(--color-primary); background: #fff0e8; font-size: 15px; }
+.order-kpi-icon.tone-1 { color: var(--admin-success); background: var(--admin-success-light); }
+.order-kpi-icon.tone-2 { color: var(--admin-warning); background: var(--admin-warning-light); }
+.order-kpi-icon.tone-3 { color: var(--admin-danger); background: var(--admin-danger-light); }
+.order-kpis small { display: block; color: var(--admin-text-secondary); font-size: 13px; font-weight: 600; }
+.order-kpis strong { display: block; margin-top: 10px; font: 800 26px var(--font-heading); }
+
+.order-panel, .detail-card { padding: 18px; border: 1px solid var(--admin-border); border-radius: var(--radius-2xl); background: var(--color-surface); box-shadow: var(--admin-shadow-card); }
+
+.order-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 16px; }
+.order-filters label { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 220px; height: 40px; padding: 0 13px; border: 1px solid var(--admin-border); border-radius: var(--radius-pill); color: var(--admin-text-muted); background: var(--admin-surface-muted); transition: border-color var(--transition-fast); }
+.order-filters label:focus-within { border-color: var(--color-primary); background: var(--color-surface); box-shadow: 0 0 0 3px var(--color-primary-light); }
+.order-filters input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: var(--color-text); font-size: 13.5px; }
+.order-filters button { display: flex; align-items: center; gap: 7px; height: 40px; padding: 0 14px; border: 1px solid var(--admin-border); border-radius: var(--radius-lg); color: var(--admin-text-secondary); background: var(--color-surface); font-size: 13px; font-weight: 600; }
+.order-filters button:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+.order-table-wrap { overflow: auto; border: 1px solid var(--admin-border-light); border-radius: var(--radius-xl); }
+.order-table { width: 100%; min-width: 760px; border-collapse: collapse; color: var(--color-text); font-size: 13.5px; }
+.order-table thead th { padding: 0 14px; height: 42px; border-bottom: 1px solid var(--admin-border); background: var(--admin-surface-muted); color: var(--admin-text-secondary); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; text-align: left; }
+.order-table td { padding: 12px 14px; border-bottom: 1px solid var(--admin-border-light); white-space: nowrap; }
+.order-table tbody tr:last-child td { border-bottom: 0; }
+.order-table tbody tr:hover { background: var(--admin-surface-muted); }
+.order-link { padding: 0; border: 0; color: var(--color-primary); background: none; font-size: inherit; font-weight: 700; }
+.order-link:hover { text-decoration: underline; }
+.row-menu { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: var(--radius-md); color: var(--admin-text-muted); background: none; }
+.row-menu:hover { background: var(--admin-border-light); }
+
+.order-status { display: inline-block; padding: 5px 10px; border-radius: var(--radius-pill); color: var(--admin-success); background: var(--admin-success-light); font-size: 12px; font-weight: 700; text-transform: capitalize; }
+.order-status.processing, .order-status.in-review { color: #bc7600; background: var(--admin-warning-light); }
+.order-status.shipped { color: #2077bd; background: #eaf4ff; }
+.order-status.cancelled, .order-status.open { color: var(--admin-danger); background: var(--admin-danger-light); }
+.order-status.resolved, .order-status.delivered { color: var(--admin-success); background: var(--admin-success-light); }
+.order-status.approved { color: var(--admin-success); background: var(--admin-success-light); }
+.order-status.rejected { color: var(--admin-danger); background: var(--admin-danger-light); }
+
+.order-pagination { display: flex; align-items: center; justify-content: space-between; padding-top: 14px; color: var(--admin-text-muted); font-size: 12.5px; }
+.order-pagination div { display: flex; gap: 5px; }
+.order-pagination button { width: 28px; height: 28px; border: 1px solid var(--admin-border); border-radius: var(--radius-md); color: var(--admin-text-secondary); background: var(--color-surface); font-size: 12.5px; }
+.order-pagination button.active { border-color: var(--color-primary); color: #fff; background: var(--color-primary); }
+.order-pagination select { height: 28px; padding: 0 8px; border: 1px solid var(--admin-border); border-radius: var(--radius-md); color: var(--admin-text-secondary); background: var(--color-surface); font-size: 12.5px; }
+
+/* ---- Order detail ---- */
+.detail-grid { display: grid; gap: 14px; }
+.detail-grid.three { grid-template-columns: repeat(3, 1fr); }
+.detail-grid.two { grid-template-columns: 1fr 1fr; }
+.detail-card h2 { margin: 0 0 13px; font: 800 15px var(--font-heading); }
+.info-list p { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; margin: 0; border-bottom: 1px solid var(--admin-border-light); font-size: 13px; }
+.info-list p:last-child { border-bottom: 0; }
+.info-list span { color: var(--admin-text-muted); }
+.info-list b { max-width: 62%; color: var(--admin-text-secondary); font-weight: 600; text-align: right; }
+.order-page > .detail-card { margin-top: 0; }
+
+@media (max-width: 1050px) {
+  .detail-grid.three { grid-template-columns: 1fr 1fr; }
+  .detail-grid.three > :last-child { grid-column: span 2; }
+}
+@media (max-width: 650px) {
+  .order-heading { display: block; }
+  .order-heading button { margin-top: 10px; }
+  .order-panel, .detail-card { padding: 14px; }
+  .detail-grid.three, .detail-grid.three > :last-child { grid-template-columns: 1fr; grid-column: auto; }
+}
+
+/* ============================================================================
+   Returns, refunds and dispute detail. Table styling comes from finance-pages.css.
+   ============================================================================ */
+
+.fulfil-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; }
+.fulfil-kpis article { padding: 12px; border: 1px solid var(--admin-border); border-radius: 8px; background: #fff; box-shadow: var(--admin-shadow-card); }
+.fulfil-kpis article.tone-warn { border-color: var(--admin-warning); }
+.fulfil-kpis article.tone-danger { border-color: var(--admin-danger); }
+.fulfil-kpis small { display: block; color: var(--admin-text-muted); font-size: var(--font-size-lg); }
+.fulfil-kpis strong { display: block; margin-top: 6px; font: 800 22px var(--font-heading); }
+.fulfil-kpis em { display: block; margin-top: 3px; color: var(--admin-text-muted); font-size: var(--font-size-md); font-style: normal; }
+
+.fulfil-tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px; }
+.fulfil-tabs button { padding: 6px 12px; border: 1px solid var(--admin-border); border-radius: 5px; background: #fff; color: var(--admin-text-muted); font-size: var(--font-size-lg); }
+.fulfil-tabs button.active { border-color: transparent; background: var(--admin-info-light); color: #6847c7; font-weight: 700; }
+
+.fulfil-row { cursor: pointer; }
+.fulfil-row:hover td { background: var(--admin-surface-soft, #f7f8fa); }
+
+.fulfil-settle-button { padding: 5px 12px; border: 1px solid transparent; border-radius: 5px; background: #6847c7; color: #fff; font-size: var(--font-size-md); font-weight: 700; }
+
+.fulfil-settle { display: flex; flex-direction: column; gap: 11px; margin-bottom: 14px; padding: 15px; border: 1px solid var(--admin-border); border-radius: 8px; background: var(--admin-surface-soft, #f7f8fa); }
+.fulfil-settle h3 { margin: 0; font: 800 15px var(--font-heading); }
+.fulfil-settle label { display: flex; flex-direction: column; gap: 4px; color: var(--admin-text-secondary); font-size: var(--font-size-lg); font-weight: 600; }
+.fulfil-settle label small { color: var(--admin-text-muted); font-size: var(--font-size-md); font-weight: 400; line-height: 1.5; }
+.fulfil-settle input[type="text"], .fulfil-settle input:not([type]) { padding: 8px 11px; border: 1px solid var(--admin-border); border-radius: 6px; background: #fff; font: var(--font-size-lg) var(--font-body); }
+
+.fulfil-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.fulfil-choice label { flex-direction: row; align-items: flex-start; gap: 9px; padding: 11px 13px; border: 1px solid var(--admin-border); border-radius: 7px; background: #fff; cursor: pointer; }
+.fulfil-choice label.active { border-color: #6847c7; box-shadow: 0 0 0 1px #6847c7; }
+.fulfil-choice input { margin-top: 3px; }
+.fulfil-choice b { display: block; }
+
+.fulfil-settle-actions { display: flex; gap: 8px; }
+.fulfil-settle-actions button { padding: 8px 15px; border: 1px solid var(--admin-border); border-radius: 6px; background: #fff; font-size: var(--font-size-lg); }
+.fulfil-settle-actions button.primary { border-color: transparent; background: #6847c7; color: #fff; font-weight: 700; }
+
+.fulfil-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fulfil-detail h2 { margin: 0 0 8px; font: 800 16px var(--font-heading); }
+.fulfil-facts > div { display: grid; grid-template-columns: 150px 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--admin-border-light); }
+.fulfil-facts > div:last-child { border-bottom: 0; }
+.fulfil-facts dt { color: var(--admin-text-muted); font-size: var(--font-size-lg); }
+.fulfil-facts dd { margin: 0; color: var(--admin-text-secondary); font-size: var(--font-size-lg); line-height: 1.5; }
+.fulfil-facts dd small { display: block; margin-top: 2px; color: var(--admin-text-muted); font-size: var(--font-size-md); }
+
+@media (max-width: 900px) { .fulfil-kpis { grid-template-columns: repeat(2, 1fr); } .fulfil-detail { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .fulfil-kpis { grid-template-columns: 1fr; } .fulfil-choice { grid-template-columns: 1fr; } .fulfil-facts > div { grid-template-columns: 1fr; gap: 2px; } }

@@ -22,3 +22,23 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Generated at build time by scripts/generate-sitemap.mjs
+public/sitemap.xml
+
+# Server secrets and local database config
+server/.env
+server/.env.local
+
+# Local development MariaDB (lives outside the repo, but guard anyway)
+.devdb/
+
+# Local frontend env
+.env
+.env.local
+apps/*/.env
+apps/*/.env.local
+!apps/*/.env.example
+
+# Seller verification documents (identity papers — never committed)
+server/storage/

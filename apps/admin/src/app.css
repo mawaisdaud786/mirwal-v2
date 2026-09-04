@@ -1,0 +1,3 @@
+/* Admin application base. Panel chrome lives in pages/admin.css. */
+:root { color-scheme: light; }
+body { margin: 0; background: var(--admin-surface-muted, #fafbfc); }

@@ -1,0 +1,62 @@
+/* ============================================================================
+   Admin Customers & Reviews — real data (server/src/modules/admin), sharing
+   the generic Heading/Kpis/Filters/Table components with section="customer".
+   Same premium spacing pass as order-pages.css / products.css.
+   ============================================================================ */
+
+.customer-page { display: flex; flex-direction: column; gap: 18px; max-width: 1280px; margin: auto; }
+
+.customer-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.customer-heading h1 { margin: 0; font: 800 24px var(--font-heading); }
+.customer-heading p { display: flex; align-items: center; gap: 7px; margin: 5px 0 0; color: var(--admin-text-muted); font-size: 13px; }
+.customer-heading p i { font-size: 10px; }
+.customer-heading button { display: flex; align-items: center; gap: 7px; padding: 10px 14px; border: 1px solid var(--admin-border); border-radius: var(--radius-lg); color: var(--admin-text-secondary); background: var(--color-surface); font-size: 13px; font-weight: 600; }
+.customer-heading .primary { border-color: var(--color-primary); color: #fff; background: var(--color-primary); }
+
+.customer-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.customer-kpis article { position: relative; min-height: 92px; padding: 16px; border: 1px solid var(--admin-border); border-radius: var(--radius-2xl); background: var(--color-surface); box-shadow: var(--admin-shadow-card); }
+.customer-kpi-icon { position: absolute; top: 16px; right: 16px; display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--radius-xl); color: #6847c7; background: #f2edff; font-size: 15px; }
+.customer-kpi-icon.tone-1 { color: var(--admin-success); background: var(--admin-success-light); }
+.customer-kpi-icon.tone-2 { color: var(--admin-warning); background: var(--admin-warning-light); }
+.customer-kpi-icon.tone-3 { color: var(--admin-danger); background: var(--admin-danger-light); }
+.customer-kpi-icon.tone-4 { color: #1876c9; background: #eaf4ff; }
+.customer-kpis small { display: block; color: var(--admin-text-secondary); font-size: 13px; font-weight: 600; }
+.customer-kpis strong { display: block; margin-top: 10px; font: 800 26px var(--font-heading); }
+
+.customer-panel { padding: 18px; border: 1px solid var(--admin-border); border-radius: var(--radius-2xl); background: var(--color-surface); box-shadow: var(--admin-shadow-card); }
+
+.customer-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 16px; }
+.customer-filters label { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 220px; height: 40px; padding: 0 13px; border: 1px solid var(--admin-border); border-radius: var(--radius-pill); color: var(--admin-text-muted); background: var(--admin-surface-muted); transition: border-color var(--transition-fast); }
+.customer-filters label:focus-within { border-color: var(--color-primary); background: var(--color-surface); box-shadow: 0 0 0 3px var(--color-primary-light); }
+.customer-filters input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: var(--color-text); font-size: 13.5px; }
+.customer-filters button { display: flex; align-items: center; gap: 7px; height: 40px; padding: 0 14px; border: 1px solid var(--admin-border); border-radius: var(--radius-lg); color: var(--admin-text-secondary); background: var(--color-surface); font-size: 13px; font-weight: 600; }
+.customer-filters button:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+.customer-table-wrap { overflow: auto; border: 1px solid var(--admin-border-light); border-radius: var(--radius-xl); }
+.customer-table { width: 100%; min-width: 780px; border-collapse: collapse; color: var(--color-text); font-size: 13.5px; }
+.customer-table thead th { padding: 0 14px; height: 42px; border-bottom: 1px solid var(--admin-border); background: var(--admin-surface-muted); color: var(--admin-text-secondary); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; text-align: left; }
+.customer-table td { padding: 12px 14px; border-bottom: 1px solid var(--admin-border-light); white-space: nowrap; }
+.customer-table tbody tr:last-child td { border-bottom: 0; }
+.customer-table tbody tr:hover { background: var(--admin-surface-muted); }
+.customer-name { padding: 0; border: 0; color: var(--color-text); background: transparent; font-weight: 700; cursor: pointer; }
+.customer-name:hover { color: var(--color-primary); }
+.row-menu { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: var(--radius-md); color: var(--admin-text-muted); background: none; }
+.row-menu:hover { background: var(--admin-border-light); }
+
+.customer-status { display: inline-block; padding: 5px 10px; border-radius: var(--radius-pill); color: var(--admin-success); background: var(--admin-success-light); font-size: 12px; font-weight: 700; }
+.customer-status.inactive, .customer-status.permanently { color: var(--admin-danger); background: var(--admin-danger-light); }
+.customer-status.temporary, .customer-status.in-progress { color: #bc7600; background: var(--admin-warning-light); }
+.customer-status.open { color: var(--admin-danger); background: var(--admin-danger-light); }
+.customer-status.resolved, .customer-status.published { color: var(--admin-success); background: var(--admin-success-light); }
+
+.customer-pagination { display: flex; align-items: center; justify-content: space-between; padding-top: 14px; color: var(--admin-text-muted); font-size: 12.5px; }
+.customer-pagination div { display: flex; gap: 5px; }
+.customer-pagination button { width: 28px; height: 28px; border: 1px solid var(--admin-border); border-radius: var(--radius-md); color: var(--admin-text-secondary); background: var(--color-surface); font-size: 12.5px; }
+.customer-pagination button.active { border-color: var(--color-primary); color: #fff; background: var(--color-primary); }
+.customer-pagination select { height: 28px; padding: 0 8px; border: 1px solid var(--admin-border); border-radius: var(--radius-md); color: var(--admin-text-secondary); background: var(--color-surface); font-size: 12.5px; }
+
+@media (max-width: 650px) {
+  .customer-heading { display: block; }
+  .customer-heading button { margin-top: 10px; }
+  .customer-panel { padding: 14px; }
+}

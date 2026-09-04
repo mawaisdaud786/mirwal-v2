@@ -1,0 +1,82 @@
+/* ============================================================================
+   Admin support queue — the staff side of seller/customer tickets.
+   ============================================================================ */
+
+.support-page { display: flex; flex-direction: column; gap: 18px; max-width: 1280px; margin: auto; }
+.support-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.support-heading h1 { margin: 0; font: 800 24px var(--font-heading); }
+.support-heading p { display: flex; align-items: center; gap: 7px; margin: 5px 0 0; color: var(--admin-text-muted); font-size: var(--font-size-md); }
+
+.support-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.support-kpis article { position: relative; min-height: 74px; padding: 12px; border: 1px solid var(--admin-border); border-radius: 8px; background: #fff; box-shadow: var(--admin-shadow-card); }
+.support-kpis article > span { position: absolute; top: 12px; right: 11px; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; color: #6847c7; background: var(--admin-info-light); }
+.support-kpi-icon.tone-1 { color: var(--admin-success); background: var(--admin-success-light); }
+.support-kpi-icon.tone-2 { color: var(--admin-warning); background: var(--admin-warning-light); }
+.support-kpis small { display: block; color: var(--admin-text-muted); font-size: var(--font-size-md); }
+.support-kpis strong { display: block; margin-top: 6px; font: 800 21px var(--font-heading); }
+
+.support-panel { padding: 14px; border: 1px solid var(--admin-border); border-radius: 8px; background: #fff; box-shadow: var(--admin-shadow-card); }
+
+.support-flash { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; padding: 9px 12px; border-radius: 6px; font-size: var(--font-size-md); }
+.support-flash.success { color: var(--admin-success); background: var(--admin-success-light); }
+.support-flash.error { color: var(--admin-danger); background: var(--admin-danger-light); }
+.support-error-note { margin: 0 0 8px; color: var(--admin-danger); font-size: var(--font-size-md); }
+
+.support-tabs { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; border-bottom: 1px solid var(--admin-border); overflow-x: auto; }
+.support-tabs > button { padding: 9px 0; border: 0; border-bottom: 2px solid transparent; color: var(--admin-text-muted); background: transparent; white-space: nowrap; font-size: var(--font-size-md); }
+.support-tabs > button.active { color: var(--color-primary); border-color: var(--color-primary); font-weight: 700; }
+.support-search { display: flex; align-items: center; gap: 7px; height: 30px; margin: 0 0 6px auto; padding: 0 9px; border: 1px solid var(--admin-border); border-radius: 5px; color: var(--admin-text-muted); }
+.support-search input { min-width: 200px; border: 0; outline: 0; font-size: var(--font-size-md); }
+
+/* Two panes: the queue on the left, the open conversation on the right. */
+.support-layout { display: grid; grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); gap: 14px; align-items: start; }
+.support-list { display: flex; flex-direction: column; gap: 8px; max-height: 620px; overflow-y: auto; }
+.support-item { display: flex; flex-direction: column; gap: 4px; padding: 10px; border: 1px solid var(--admin-border); border-radius: 7px; background: #fff; text-align: left; }
+.support-item.active { border-color: var(--color-primary); background: var(--color-primary-lighter, #fff7ef); }
+.support-item-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.support-item code { color: var(--admin-text-muted); font-family: var(--font-mono, monospace); font-size: var(--font-size-sm); }
+.support-item strong { color: var(--admin-text-secondary); font-size: var(--font-size-md); }
+.support-item small { color: var(--admin-text-muted); font-size: var(--font-size-sm); text-transform: capitalize; }
+
+.support-status { padding: 2px 7px; border-radius: var(--radius-pill); font-style: normal; font-size: var(--font-size-sm); font-weight: 700; text-transform: capitalize; }
+.support-status.open { color: var(--admin-warning); background: var(--admin-warning-light); }
+.support-status.pending { color: #6847c7; background: var(--admin-info-light); }
+.support-status.resolved { color: var(--admin-success); background: var(--admin-success-light); }
+.support-status.closed { color: var(--admin-text-muted); background: var(--admin-surface-muted); }
+
+.support-thread { display: flex; flex-direction: column; gap: 12px; min-height: 340px; padding: 14px; border: 1px solid var(--admin-border); border-radius: 8px; background: var(--admin-surface-muted); }
+.support-thread-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.support-thread-head h2 { margin: 0; font: 800 18px var(--font-heading); }
+.support-thread-head p { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin: 4px 0 0; color: var(--admin-text-muted); font-size: var(--font-size-md); }
+.support-thread-actions { display: flex; gap: 8px; }
+.support-thread-actions select { height: 30px; padding: 0 8px; border: 1px solid var(--admin-border); border-radius: 5px; background: #fff; color: var(--admin-text-secondary); font-size: var(--font-size-md); text-transform: capitalize; }
+
+.support-messages { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.support-message { padding: 10px 12px; border-radius: 8px; background: #fff; border: 1px solid var(--admin-border); }
+/* Staff replies sit visually opposite the requester's, so a thread reads as a conversation. */
+.support-message.staff { margin-left: 28px; background: #f4f8ff; border-color: #dbe6f7; }
+.support-message.requester { margin-right: 28px; }
+/* An internal note must never be mistaken for something the requester can read. */
+.support-message.internal { background: var(--admin-warning-light); border-color: #f0d9a8; border-left: 3px solid var(--admin-warning); }
+.support-message-meta { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 5px; }
+.support-message-meta strong { color: var(--admin-text-secondary); font-size: var(--font-size-md); }
+.support-message-meta em { display: flex; align-items: center; gap: 5px; color: #a06800; font-style: normal; font-size: var(--font-size-sm); font-weight: 700; }
+.support-message-meta time { margin-left: auto; color: var(--admin-text-muted); font-size: var(--font-size-sm); }
+.support-message p { margin: 0; color: var(--admin-text-secondary); font-size: var(--font-size-md); line-height: 1.5; white-space: pre-wrap; }
+
+.support-composer { display: flex; flex-direction: column; gap: 9px; margin-top: auto; }
+.support-composer textarea { width: 100%; padding: 9px; border: 1px solid var(--admin-border); border-radius: 6px; background: #fff; color: var(--admin-text-secondary); font: var(--font-size-md) var(--font-body); resize: vertical; }
+.support-composer-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.support-composer-actions label { display: flex; align-items: center; gap: 7px; color: var(--admin-text-muted); font-size: var(--font-size-md); }
+.support-composer-actions label.internal-on { color: #a06800; font-weight: 700; }
+.support-composer-actions input { width: 15px; height: 15px; accent-color: var(--admin-warning); }
+.support-composer-actions button { padding: 8px 15px; border: 1px solid var(--admin-border); border-radius: 5px; background: #fff; color: #52606b; font-size: var(--font-size-md); }
+.support-composer-actions .primary { border-color: var(--color-primary); color: #fff; background: var(--color-primary); }
+.support-composer-actions button:disabled { opacity: .55; }
+
+@media (max-width: 900px) {
+  .support-kpis { grid-template-columns: repeat(2, 1fr); }
+  .support-layout { grid-template-columns: 1fr; }
+  .support-list { max-height: 260px; }
+  .support-message.staff, .support-message.requester { margin-left: 0; margin-right: 0; }
+}

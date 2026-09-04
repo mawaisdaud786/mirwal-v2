@@ -1,0 +1,55 @@
+/* ============================================================================
+   Maintenance mode and database exports. Builds on security-pages.css, which
+   already carries the panel, switch, facts-list and table styles.
+   ============================================================================ */
+
+/* Deliberately loud: this banner means the public storefront is closed. */
+.platform-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin: 0;
+  padding: 13px 15px;
+  border: 1px solid var(--admin-warning);
+  border-radius: 8px;
+  background: var(--admin-warning-light);
+  color: #8a5a00;
+  font-size: var(--font-size-xl);
+  line-height: 1.55;
+}
+.platform-banner i { font-size: 18px; }
+.platform-banner b { display: block; }
+
+.security-form textarea {
+  padding: 9px 11px;
+  border: 1px solid var(--admin-border);
+  border-radius: 6px;
+  background: #fff;
+  font: var(--font-size-lg) var(--font-body);
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.platform-row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.platform-row-actions button {
+  padding: 5px 10px;
+  border: 1px solid var(--admin-border);
+  border-radius: 5px;
+  background: #fff;
+  color: var(--admin-text-secondary);
+  font-size: var(--font-size-md);
+  white-space: nowrap;
+}
+.platform-row-actions button.danger { color: var(--admin-danger); border-color: var(--admin-danger-light); }
+.platform-row-actions button:disabled { opacity: .55; }
+
+.security-table td small.failed { color: var(--admin-danger); }
+.security-table td small.running { color: var(--admin-warning); }
+.security-facts dd code,
+.security-note code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--admin-border-light);
+  font: var(--font-size-md) ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+}

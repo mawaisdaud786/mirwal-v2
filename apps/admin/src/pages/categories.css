@@ -1,0 +1,85 @@
+/* ============================================================================
+   Admin Categories — real data (GET /categories). Same premium spacing pass
+   as products.css / order-pages.css.
+   ============================================================================ */
+
+.categories-page { display: flex; flex-direction: column; gap: 18px; max-width: 1280px; margin: auto; }
+.categories-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.categories-heading h1 { margin: 0; font: 800 24px var(--font-heading); }
+.categories-heading p { display: flex; align-items: center; gap: 7px; margin: 5px 0 0; color: var(--admin-text-muted); font-size: 13px; }
+.categories-heading p i { font-size: 10px; }
+.categories-heading button { display: flex; align-items: center; gap: 7px; padding: 10px 14px; border: 1px solid var(--admin-border); border-radius: var(--radius-lg); color: var(--admin-text-secondary); background: var(--color-surface); font-size: 13px; font-weight: 600; }
+.categories-heading button.primary { border-color: var(--color-primary); color: #fff; background: var(--color-primary); }
+.categories-heading button:disabled { cursor: not-allowed; opacity: .55; }
+
+.category-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.category-kpi { position: relative; min-height: 92px; padding: 16px; border: 1px solid var(--admin-border); border-radius: var(--radius-2xl); background: var(--color-surface); box-shadow: var(--admin-shadow-card); }
+.category-kpi > span { position: absolute; top: 16px; right: 16px; display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--radius-xl); color: var(--color-primary); background: #fff0e8; font-size: 15px; }
+.category-kpi.green > span { color: var(--admin-success); background: var(--admin-success-light); }
+.category-kpi.amber > span { color: #eb9511; background: var(--admin-warning-light); }
+.category-kpi.violet > span { color: #8256d2; background: var(--admin-info-light); }
+.category-kpi.blue > span { color: #1876c9; background: #eaf4ff; }
+.category-kpis small { display: block; color: var(--admin-text-secondary); font-size: 13px; font-weight: 600; }
+.category-kpis strong { display: block; margin-top: 10px; overflow: hidden; font: 800 20px var(--font-heading); text-overflow: ellipsis; white-space: nowrap; }
+.category-kpis em { display: block; margin-top: 5px; color: var(--admin-success); font-size: 12px; font-style: normal; }
+
+.categories-panel { padding: 18px; border: 1px solid var(--admin-border); border-radius: var(--radius-2xl); background: var(--color-surface); box-shadow: var(--admin-shadow-card); }
+
+.category-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 16px; }
+.category-filters label { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 220px; height: 40px; padding: 0 13px; border: 1px solid var(--admin-border); border-radius: var(--radius-pill); color: var(--admin-text-muted); background: var(--admin-surface-muted); transition: border-color var(--transition-fast); }
+.category-filters label:focus-within { border-color: var(--color-primary); background: var(--color-surface); box-shadow: 0 0 0 3px var(--color-primary-light); }
+.category-filters input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: var(--color-text); font-size: 13.5px; }
+.category-filters button { display: flex; align-items: center; gap: 7px; height: 40px; padding: 0 14px; border: 1px solid var(--admin-border); border-radius: var(--radius-lg); color: var(--admin-text-secondary); background: var(--color-surface); font-size: 13px; font-weight: 600; }
+.category-filters button:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+.categories-table-wrap { overflow: auto; border: 1px solid var(--admin-border-light); border-radius: var(--radius-xl); }
+.categories-table { width: 100%; min-width: 700px; border-collapse: collapse; color: var(--color-text); font-size: 13.5px; }
+.categories-table th { padding: 0 14px; height: 42px; border-bottom: 1px solid var(--admin-border); background: var(--admin-surface-muted); color: var(--admin-text-secondary); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; text-align: left; }
+.categories-table td { padding: 12px 14px; border-bottom: 1px solid var(--admin-border-light); }
+.categories-table tbody tr:last-child td { border-bottom: 0; }
+.categories-table tbody tr:hover { background: var(--admin-surface-muted); }
+
+.category-name { display: flex; align-items: center; gap: 11px; min-width: 200px; }
+.category-name img { width: 36px; height: 36px; object-fit: contain; border: 1px solid var(--admin-border-light); border-radius: var(--radius-md); background: var(--admin-surface-muted); }
+.category-name strong { font-size: 13.5px; font-weight: 600; }
+
+.categories-table td > button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--admin-border); border-radius: var(--radius-md); color: var(--admin-text-secondary); background: var(--color-surface); }
+.categories-table td > button + button { margin-left: 6px; }
+.categories-table td > button:disabled { cursor: not-allowed; opacity: .5; }
+
+@media (max-width: 650px) {
+  .categories-heading { display: block; }
+  .categories-heading button { margin-top: 10px; }
+  .categories-panel { padding: 14px; }
+}
+
+/* ---- Real category management (admin CRUD) ---- */
+.categories-flash{display:flex;align-items:center;gap:8px;margin:0 0 12px;padding:9px 12px;border-radius:6px;font-size:var(--font-size-md)}
+.categories-flash.success{color:var(--admin-success);background:var(--admin-success-light)}
+.categories-flash.error{color:var(--admin-danger);background:var(--admin-danger-light)}
+.categories-error-note{margin:0 0 8px;color:var(--admin-danger);font-size:var(--font-size-md)}
+.categories-heading .primary{display:flex;align-items:center;gap:7px;padding:8px 14px;border:1px solid var(--color-primary);border-radius:6px;color:#fff;background:var(--color-primary);font-size:var(--font-size-md)}
+.categories-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.categories-kpis article{padding:12px;border:1px solid var(--admin-border);border-radius:8px;background:#fff}
+.categories-kpis small{display:block;color:var(--admin-text-muted);font-size:var(--font-size-md)}
+.categories-kpis strong{display:block;margin-top:5px;font:800 20px var(--font-heading)}
+.categories-table td strong{display:block;color:var(--admin-text-secondary)}
+.categories-table td small{display:block;margin-top:2px;color:var(--admin-text-muted);font-size:12px}
+.categories-muted{color:var(--admin-text-muted)}
+.categories-toggle{padding:5px 10px;border:1px solid var(--admin-border);border-radius:5px;background:#fff;color:var(--admin-text-muted);font-size:12px}
+.categories-toggle.on{color:var(--admin-success);border-color:var(--admin-success-light);background:var(--admin-success-light)}
+.categories-danger{padding:5px 9px;border:1px solid var(--admin-border);border-radius:5px;color:var(--admin-danger);background:#fff}
+.categories-toggle:disabled,.categories-danger:disabled{opacity:.5}
+.categories-form{display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:720px}
+.categories-form-wide{grid-column:span 2}
+.categories-form label>span{display:block;margin-bottom:5px;color:var(--admin-text-secondary);font-size:var(--font-size-md);font-weight:600}
+.categories-form label>small{display:block;margin-top:5px;color:var(--admin-text-muted);font-size:12px}
+.categories-form input,.categories-form select,.categories-form textarea{width:100%;padding:9px 10px;border:1px solid var(--admin-border);border-radius:6px;background:#fff;color:var(--admin-text-secondary);font:var(--font-size-md) var(--font-body);outline:0}
+.categories-checkbox{display:flex;align-items:center;gap:8px}
+.categories-checkbox input{width:16px;height:16px;accent-color:var(--color-primary)}
+.categories-checkbox>span{margin:0 !important;font-weight:400 !important}
+.categories-form-actions{grid-column:span 2;display:flex;gap:9px}
+.categories-form-actions button{padding:9px 16px;border:1px solid var(--admin-border);border-radius:6px;background:#fff;color:#52606b;font-size:var(--font-size-md)}
+.categories-form-actions .primary{border-color:var(--color-primary);color:#fff;background:var(--color-primary)}
+.categories-form-actions button:disabled{opacity:.55}
+@media(max-width:760px){.categories-kpis{grid-template-columns:repeat(2,1fr)}.categories-form{grid-template-columns:1fr}.categories-form-wide,.categories-form-actions{grid-column:span 1}}
