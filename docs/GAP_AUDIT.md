@@ -882,7 +882,59 @@ Settings
 
 ### Phase B — Around launch (first 60 days)
 
-B1 Dispute lifecycle + admin override of seller return decisions · B2 Enforcement actions + violations ledger + appeals · B3 Trust & risk scores (v1: verification + rating + cancellation + returns + upheld reports) · B4 Brand authorisations · B5 Tax (GST on orders, withholding on payouts, invoices) · B6 Seller performance page (seller-facing) with thresholds and automated warnings · B7 Automated product pre-checks (prohibited terms, duplicates, price sanity, image hashes) · B8 Admin Operations Queue dashboard · B9 Return lifecycle expansion (more-info, in-transit, received, replacement, evidence) · B10 Partial cancellation / partial refund · B11 `cancelled_by` on order items (buyer vs seller) · B12 Order-level buyer↔seller messaging · B13 Per-endpoint rate limiting · B14 Background job runner · B15 Notification preferences + digests.
+**Status: complete.** All fifteen are built, wired through the admin, seller and storefront
+panels, and covered by the server test suite.
+
+| # | Item | Where it lives |
+| --- | --- | --- |
+| B1 | Dispute lifecycle + admin override of seller return decisions | `orders/returns.service.js` (`escalate`, `decide`), `/admin/returns/disputes` |
+| B2 | Enforcement actions + violations ledger + appeals | `safety/` , `seller_enforcement_actions`, `/seller/me/compliance` |
+| B3 | Trust & risk scores | `safety/scoring.service.js` — dual scores; the risk score is never returned to a seller |
+| B4 | Brand authorisations | `catalog/brandAuth.service.js` — gating is **per brand**, and a gate blocks the listing, not the seller |
+| B5 | Tax: GST on orders, withholding on payouts, invoices | `orders/pricing.service.js`, `payouts.service.js`, `orders/invoices.service.js` |
+| B6 | Seller performance page | `/seller/me/trust` + `apps/seller/src/pages/Performance.jsx` |
+| B7 | Automated product pre-checks | `catalog/moderation.service.js` — `block` refuses, `flag` only raises risk for a human |
+| B8 | Admin operations queue | `/admin/work-queue` — a queue it cannot read reports as unavailable, never as zero |
+| B9 | Return lifecycle expansion | migration 021/028 statuses, evidence and the return conversation |
+| B10 | Partial cancellation / partial refund | `orders/cancellation.service.js`, `payments/refunds.service.js#createDiscretionaryRefund` |
+| B11 | `cancelled_by` on order items | Written by all three cancellation paths, so a seller's failure and a buyer's change of mind score separately |
+| B12 | Order-level buyer↔seller messaging | `orders/messages.service.js` — one thread per *(order, seller)* |
+| B13 | Per-endpoint rate limiting | `middleware/rateLimit`, `tests/rate-limits.test.js` |
+| B14 | Background job runner | `jobs/scheduler.js` — advisory lock plus an in-process guard |
+| B15 | Notification preferences + digests | `notifications/`, `tests/notification-preferences.test.js` |
+
+Three decisions inside Phase B that are worth carrying forward rather than rediscovering:
+
+* **A cancelled line keeps its numbers.** `ck_order_items_quantity` forbids a zero quantity, and
+  more importantly the line is the record of what was ordered. Order money is summed from the
+  lines that are still live instead.
+* **An invoice is a snapshot, not a view.** A later refund is a credit against it, never an edit
+  to it, and the numbering is gapless because a tax authority reads a gap as a deleted invoice.
+* **A refund no longer needs a return.** Inventing a return to refund a buyer corrupted the very
+  return statistics sellers are scored on; `refunds.kind` keeps the two apart.
+
+### Panel usability pass — table drill-down, CRUD and pagination
+
+Done across both panels, ahead of Phase C. Three problems that ran through every list:
+
+* **Rows were dead ends.** A row naming a product, its category, its store and its buyer offered
+  at most one way in — often none. Any column that names an entity is now a link to it.
+* **Lists were capped, not paged.** `pageSize: 50` and `pageSize: 100` read as pages and behaved
+  as ceilings: rows past the cap were unreachable and nothing on screen said so. Several
+  endpoints returned everything and filtered in the browser, so the search box only searched
+  what had already arrived. Fifteen lists now page, filter and search in the database.
+* **Controls did not match permissions.** Buttons appeared for operators the route would refuse.
+  `can(...)` on both session contexts mirrors `requirePermission`, so a control is shown only
+  when the endpoint behind it would accept the call — presentation, never the boundary.
+
+New detail screens: product, customer, category and brand. New endpoints:
+`GET /admin/customers/:id`, `GET /admin/orders/counts`, `GET /seller/me/orders/counts`,
+`GET /seller/me/products/status-counts`, plus a `brandId` product filter.
+
+Two things this turned up: the admin "Add New Product" button was disabled with a note saying
+there was no backend, when `POST /admin/products` and the form behind it both worked; and
+`/coupons/:id` and `/promotions/:id` rendered the blank create form whichever row was clicked,
+so those links could only ever add a second record.
 
 ### Phase C — Post-launch (60–180 days)
 
@@ -908,3 +960,79 @@ Ranked by (safety value) ÷ (effort). Every one is small.
 8. Add per-endpoint rate limits to upload, report, review and payout-request. *(a day)*
 9. Delete the dead nav items and the unreferenced mock data files. *(an hour)*
 10. Confirm and enforce `security.require_2fa_for_staff` at login. *(a day)*
+
+---
+
+## IMPLEMENTATION STATUS — 4 September 2026
+
+This section records what has actually been built since the audit above was written. The audit
+text is left as it was found so the two can be read against each other.
+
+### Delivered and verified
+
+**Migrations 020–024** (all applied; `npm run db:reset` rebuilds cleanly):
+
+| Migration | What it adds |
+|---|---|
+| `020_seller_onboarding_and_kyc` | `seller_applications`, `seller_bank_accounts`, `pii_access_logs`, `verification_tokens`; KYC/lifecycle/standing columns on `sellers`; document metadata (number, expiry, rejection code, supersedes); **20 new permissions and 7 operational roles** |
+| `021_fulfilment_and_ledger` | `shipments`, `shipment_items`, `carriers` (seeded with the real Pakistani couriers), `order_events`, `seller_ledger_entries`, `return_evidence`; discount/tax/coupon columns on `orders`; `cancelled_by`, commission and real fulfilment timestamps on `order_items`; expanded return lifecycle |
+| `022_store_profile_and_media` | `store_policies`, `media_assets`; store SEO/about/hours |
+| `023_trust_and_safety` | `cases` + messages/evidence, `seller_enforcement_actions`, `seller_scores` + history, review moderation columns, `review_reports`, `review_responses`, `review_votes`, `brand_authorizations`, `product_moderation_events`, `moderation_rules` (seeded with the Pakistani counterfeit vocabulary) |
+| `024_backfill_seller_ledger` | Reconstructs earnings, commission, payouts and refunds from existing orders — without it, introducing the ledger would have zeroed every existing seller's balance |
+
+**Roadmap items now complete:**
+
+- **A1** — seller-status enforced on every public catalogue read (`SELLER_IS_TRADING`), plus a
+  `setProductApproval` guard so approving a suspended seller's queued listing is refused.
+- **A2/A3** — full seller onboarding: application → review → decision → store creation, with
+  per-seller-type requirements, duplicate-CNIC/NTN blocking, reason codes, more-information
+  cycles and expiry. **Browser-verified end to end**: storefront form → API → admin queue.
+- **A4** — seller store is editable (`PATCH /seller/me/store`), plus a public media upload path
+  and product-image management. Sellers can now list a product with photographs.
+- **A6** — email and phone verification (`verification_tokens`, OTP with attempt limiting).
+- **A7** — shipments with carrier, tracking number, proof of delivery, COD amount and a
+  `failed_delivery` state that is not scored as a cancellation.
+- **A8** — real shipping at checkout. **Verified**: Rs. 509 + Rs. 250 zone rate = Rs. 759.
+- **A9** — the seller ledger: hold window, reserve against open returns, clawback, adjustments,
+  withholding tax. Payouts are now balance-driven and gated on a verified payout account.
+- **A10** — coupons apply at checkout. **Verified**: WELCOME10 → Rs. 50.90 off, redemption
+  recorded, discount correctly attributed as platform-funded so the seller is paid in full.
+- **A11** — the unified case model, with enforcement actions and appeals. Product reporting is
+  reachable from the product page for the first time. **Browser-verified**, including the
+  anonymous path.
+- **A12** — review moderation (hide/remove/reinstate), review reports, seller responses,
+  helpfulness voting, and suspicious-pattern detection.
+- **A13** — permissions split: `seller.kyc.view` separated from `seller.application.decide`,
+  and payouts/marketing/integrations split out of the single `settings.manage` key.
+- **PII access logging** — reading a CNIC or a full IBAN is now its own logged, separately
+  permissioned event, which `audit_logs` never captured.
+
+**Pre-existing bugs found and fixed along the way:**
+
+1. `db/seed.js` imported `src/data/mockData.js` — a path left behind by the monorepo refactor,
+   so `npm run db:reset` had been failing.
+2. `platform_settings` defaults were seeded only by the settings *read* path, so saving a
+   declared default on a fresh install was rejected as an unknown key — and `getSetting` fell
+   back to each caller's private idea of the default.
+3. The test suite was intermittently red because it had grown past the global rate limit;
+   `MIRWAL_TEST` now relaxes that limiter (and only that one).
+4. `apps/storefront/src/checkout.css` was an orphan nobody imported.
+
+**Verification:** 170 backend tests pass on a clean database (10 of them new, covering
+onboarding end to end), `eslint .` is clean across the monorepo, and all three apps build.
+
+### Not yet done
+
+Everything below is still outstanding, in roadmap order:
+
+- **A5** — order confirmation and shipped email are wired, but the SMS channel has no provider
+  configured, and payout/verification mail is defined and not yet sent from every path.
+- **A14** — new-device login alerts (`security.new_device_login` template exists; nothing emits
+  it) and email/password-change alerts to the *previous* address.
+- **A15** — the reconciliation sweep for stuck `pending` payment attempts, and the background
+  job runner generally (`expireStaleApplications` and `expireActions` are written and have no
+  scheduler calling them).
+- **Frontend panels** — the seller panel's store/media/bank/compliance/shipment screens and the
+  admin panel's applications/cases/review-moderation screens are not yet wired to the new
+  endpoints. The APIs and the storefront are done; these two panels are the remaining surface.
+- **Phases B, C and D** in §20 are untouched.

@@ -42,3 +42,8 @@ apps/*/.env.local
 
 # Seller verification documents (identity papers — never committed)
 server/storage/
+
+# Stray build archive and refactor scratch artifacts (see DEPLOYMENT notes)
+server.zip
+*.zip
+.migration/
