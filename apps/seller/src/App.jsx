@@ -41,13 +41,17 @@ const SellerReturnsRefunds = lazy(() => import('./pages/ReturnsRefunds'))
 const SellerRequestDetails = lazy(() => import('./pages/RequestDetails'))
 const SellerCustomers = lazy(() => import('./pages/Customers'))
 const SellerCatalogPage = lazy(() => import('./pages/CatalogPage'))
+const SellerPerformance = lazy(() => import('./pages/Performance'))
 const SellerNotifications = lazy(() => import('./pages/SellerNotifications'))
 
 const sellerBreadcrumbLabels = { products: 'Products', add: 'Add Product', categories: 'Categories', brands: 'Brands', orders: 'Orders', returns: 'Returns & Refunds', cancelled: 'Cancellations', finance: 'Finance', withdrawals: 'Withdrawals', settings: 'Settings', store: 'Store', profile: 'Store Profile', shipping: 'Shipping Settings', marketing: 'Marketing', promotions: 'Promotions', discounts: 'Discounts', coupons: 'Coupons', ads: 'Ads Campaigns', recommendations: 'Marketing Recommendations', performance: 'Marketing Performance', help: 'Help Center', support: 'Seller Support' }
 
 function SellerRouteLayout() {
   const { pathname: path } = useLocation()
-  const sellerActiveItem = path.startsWith('/marketing') || path === '/coupons'
+  // Checked before the marketing branch, which also owns a path ending in `/performance`.
+  const sellerActiveItem = path === '/performance'
+    ? 'performance-page'
+    : path.startsWith('/marketing') || path === '/coupons'
     ? (path.includes('/promotions') ? 'promotions' : path.includes('/discounts') ? 'discounts' : path.includes('/coupons') || path === '/coupons' ? 'coupons' : path.includes('/ads') || path.includes('/campaigns') ? 'ads' : path.includes('/recommendations') ? 'recommendations' : path.includes('/performance') ? 'performance' : 'marketing-overview')
     : path.startsWith('/products') || ['/categories', '/brands', '/reviews'].includes(path)
     ? (path.includes('/add') ? 'add-product' : path.includes('/categories') ? 'categories' : path.includes('/brands') ? 'brands' : path.includes('/reviews') ? 'reviews' : 'all-products')
@@ -61,10 +65,15 @@ function SellerRouteLayout() {
     : path.startsWith('/support') ? 'seller-support'
     : 'dashboard'
   const sellerBreadcrumbs = [{ label: 'Dashboard', onClick: () => navigateTo('/') }]
-  path.split('/').filter(Boolean).forEach((segment) => {
-    const label = sellerBreadcrumbLabels[segment]
-    if (label && sellerBreadcrumbs[sellerBreadcrumbs.length - 1].label !== label) sellerBreadcrumbs.push({ label })
-  })
+  // The labels are keyed by path segment, and `performance` belongs to two different pages —
+  // the store's own scorecard and the marketing report. The store one wins at the top level.
+  if (path === '/performance') sellerBreadcrumbs.push({ label: 'Performance' })
+  else {
+    path.split('/').filter(Boolean).forEach((segment) => {
+      const label = sellerBreadcrumbLabels[segment]
+      if (label && sellerBreadcrumbs[sellerBreadcrumbs.length - 1].label !== label) sellerBreadcrumbs.push({ label })
+    })
+  }
   return <SellerLayout activeItem={sellerActiveItem} breadcrumbs={sellerBreadcrumbs}><Outlet /></SellerLayout>
 }
 
@@ -121,6 +130,7 @@ function SellerApp() {
         <Route path="/withdrawals" element={<SellerFinancePage type="withdrawals" />} />
         <Route path="/finance/settings" element={<SellerFinancePage type="settings" />} />
         <Route path="/store/payments" element={<SellerFinancePage type="settings" />} />
+        <Route path="/performance" element={<SellerPerformance />} />
         <Route path="/store/verification" element={<SellerVerification />} />
         <Route path="/verification" element={<SellerVerification />} />
         <Route path="/store/profile" element={<SellerStoreProfile page="information" />} />
@@ -161,12 +171,18 @@ function SellerApp() {
         <Route path="/coupons" element={<SellerMarketing view="coupons" />} />
         <Route path="/marketing/promotions" element={<SellerMarketing view="promotions" />} />
         <Route path="/marketing/promotions/create" element={<SellerMarketing view="create-promotion" />} />
+        {/* Reuses the create view — it already tells create and edit apart by whether the third
+            path segment is an id or the literal word "create". React Router ranks the static
+            "create" segment above this param regardless of declaration order, so the two never
+            collide. */}
+        <Route path="/marketing/promotions/:id" element={<SellerMarketing view="create-promotion" />} />
         {/* A storewide discount IS a promotion here — one concept, one screen. The links
             redirect rather than showing a page whose only job is to say so. */}
         <Route path="/marketing/discounts" element={<Navigate to="/marketing/promotions" replace />} />
         <Route path="/marketing/discounts/create" element={<Navigate to="/marketing/promotions/create" replace />} />
         <Route path="/marketing/coupons" element={<SellerMarketing view="coupons" />} />
         <Route path="/marketing/coupons/create" element={<SellerMarketing view="create-coupon" />} />
+        <Route path="/marketing/coupons/:id" element={<SellerMarketing view="create-coupon" />} />
         <Route path="/marketing/ads" element={<SellerMarketing view="ads" />} />
         <Route path="/marketing/ads/create" element={<SellerMarketing view="create-ads" />} />
         <Route path="/marketing/campaigns/create" element={<SellerMarketing view="create-ads" />} />

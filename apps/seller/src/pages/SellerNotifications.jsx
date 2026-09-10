@@ -1,6 +1,7 @@
 import SellerLayout from '../SellerLayout'
 import { EmptyState } from '../components/SellerComponents'
 import { useApiQuery, describeApiError } from '@mirwal/shared/useApiQuery'
+import NotificationPreferences from '../components/NotificationPreferences'
 import api from '../api'
 import { navigateTo } from '@mirwal/shared/navigation'
 import Icon from '@mirwal/shared/Icon'
@@ -75,5 +76,7 @@ export default function SellerNotifications() {
         </div>
       ))}
     </div>
+    {/* The feed answers what happened; this answers what should reach them next time. */}
+    <NotificationPreferences />
   </SellerLayout>
 }

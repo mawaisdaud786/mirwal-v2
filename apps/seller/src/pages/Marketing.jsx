@@ -51,6 +51,35 @@ function CouponsView({ create }) {
   const [busy, setBusy] = useState(false)
   const [flash, setFlash] = useState(null)
 
+  /**
+   * Editing, not just creating.
+   *
+   * The API has had `GET`/`PATCH /seller/me/coupons/:id` all along — the client already called
+   * them — but nothing in this form ever loaded an id or sent a patch, so a coupon's code
+   * became permanent the moment it was created and every mistake needed a fresh coupon.
+   */
+  const editingId = create && typeof window !== 'undefined'
+    ? window.location.pathname.split('/').filter(Boolean).slice(2).find((part) => part !== 'create')
+    : undefined
+  const editing = useApiQuery(
+    (signal) => (editingId ? api.seller.coupons.get(editingId, signal) : Promise.resolve(null)),
+    [editingId],
+  )
+  const [loadedFor, setLoadedFor] = useState(null)
+  if (editing.data && loadedFor !== editingId) {
+    setLoadedFor(editingId)
+    setForm({
+      code: editing.data.code ?? '',
+      name: editing.data.name ?? '',
+      discountType: editing.data.discountType ?? 'percentage',
+      discountPercent: String(editing.data.discountPercent ?? ''),
+      discountAmount: editing.data.discountAmount?.amount ?? '',
+      minOrderAmount: editing.data.minOrderAmount?.amount ?? '0.00',
+      usageLimit: editing.data.usageLimit == null ? '' : String(editing.data.usageLimit),
+      status: editing.data.status ?? 'draft',
+    })
+  }
+
   const stats = useApiQuery((signal) => api.seller.coupons.stats(signal), [])
   const list = useApiQuery((signal) => api.seller.coupons.list({ pageSize: 50 }, signal), [])
   const refresh = useCallback(() => { list.refetch(); stats.refetch() }, [list, stats])
@@ -62,7 +91,7 @@ function CouponsView({ create }) {
     setBusy(true)
     setFlash(null)
     try {
-      await api.seller.coupons.create({
+      const payload = {
         code: form.code.trim(),
         name: form.name.trim(),
         discountType: form.discountType,
@@ -71,8 +100,13 @@ function CouponsView({ create }) {
         ...(form.discountType === 'percentage' ? { discountPercent: Number(form.discountPercent) } : {}),
         ...(form.discountType === 'fixed' ? { discountAmount: form.discountAmount } : {}),
         ...(form.usageLimit ? { usageLimit: Number(form.usageLimit) } : {}),
-      })
+      }
+      // The code identifies the coupon shoppers already hold; changing its terms is a
+      // different act from renaming it, so an edit does not resend the code.
+      if (editingId) await api.seller.coupons.update(editingId, { ...payload, code: undefined })
+      else await api.seller.coupons.create(payload)
       setForm(EMPTY_COUPON)
+      setLoadedFor(null)
       navigateTo('/marketing/coupons')
       refresh()
     } catch (error) {
@@ -141,7 +175,7 @@ function CouponsView({ create }) {
             </select>
           </label>
           <div className="seller-marketing-actions">
-            <button type="submit" className="primary" disabled={busy}>{busy ? 'Saving...' : 'Create coupon'}</button>
+            <button type="submit" className="primary" disabled={busy}>{busy ? 'Saving...' : editingId ? 'Save changes' : 'Create coupon'}</button>
             <button type="button" onClick={() => navigateTo('/marketing/coupons')}>Cancel</button>
           </div>
         </form>
@@ -177,7 +211,11 @@ function CouponsView({ create }) {
                 <tbody>
                   {items.map((coupon) => (
                     <tr key={coupon.id}>
-                      <td><code>{coupon.code}</code></td>
+                      <td>
+                        <button type="button" className="table-link" onClick={() => navigateTo(`/marketing/coupons/${coupon.id}`)}>
+                          <code>{coupon.code}</code>
+                        </button>
+                      </td>
                       <td>{coupon.name}</td>
                       <td>
                         {coupon.discountType === 'percentage' && `${coupon.discountPercent}%`}
@@ -206,6 +244,32 @@ function PromotionsView({ create }) {
   const [busy, setBusy] = useState(false)
   const [flash, setFlash] = useState(null)
 
+  // Same reasoning as CouponsView: `/marketing/promotions/:id` reuses the create route, and the
+  // API already had `.get`/`.update` with nothing in this form ever calling them.
+  const editingId = create && typeof window !== 'undefined'
+    ? window.location.pathname.split('/').filter(Boolean).slice(2).find((part) => part !== 'create')
+    : undefined
+  const editing = useApiQuery(
+    (signal) => (editingId ? api.seller.promotions.get(editingId, signal) : Promise.resolve(null)),
+    [editingId],
+  )
+  const [loadedFor, setLoadedFor] = useState(null)
+  if (editing.data && loadedFor !== editingId) {
+    setLoadedFor(editingId)
+    setForm({
+      name: editing.data.name ?? '',
+      description: editing.data.description ?? '',
+      discountType: editing.data.discountType ?? 'percentage',
+      discountPercent: String(editing.data.discountPercent ?? ''),
+      discountAmount: editing.data.discountAmount?.amount ?? '',
+      // `datetime-local` wants a naked local timestamp, not the ISO string with a zone the API
+      // returns.
+      startsAt: editing.data.startsAt ? String(editing.data.startsAt).replace(' ', 'T').slice(0, 16) : '',
+      endsAt: editing.data.endsAt ? String(editing.data.endsAt).replace(' ', 'T').slice(0, 16) : '',
+      status: editing.data.status ?? 'draft',
+    })
+  }
+
   const list = useApiQuery((signal) => api.seller.promotions.list({ pageSize: 50 }, signal), [])
   const refresh = useCallback(() => { list.refetch() }, [list])
 
@@ -216,7 +280,7 @@ function PromotionsView({ create }) {
     setBusy(true)
     setFlash(null)
     try {
-      await api.seller.promotions.create({
+      const payload = {
         name: form.name.trim(),
         discountType: form.discountType,
         status: form.status,
@@ -225,8 +289,11 @@ function PromotionsView({ create }) {
         ...(form.discountType === 'fixed' ? { discountAmount: form.discountAmount } : {}),
         ...(form.startsAt ? { startsAt: new Date(form.startsAt).toISOString() } : {}),
         ...(form.endsAt ? { endsAt: new Date(form.endsAt).toISOString() } : {}),
-      })
+      }
+      if (editingId) await api.seller.promotions.update(editingId, payload)
+      else await api.seller.promotions.create(payload)
       setForm(EMPTY_PROMOTION)
+      setLoadedFor(null)
       navigateTo('/marketing/promotions')
       refresh()
     } catch (error) {
@@ -287,7 +354,7 @@ function PromotionsView({ create }) {
             </select>
           </label>
           <div className="seller-marketing-actions">
-            <button type="submit" className="primary" disabled={busy}>{busy ? 'Saving...' : 'Create promotion'}</button>
+            <button type="submit" className="primary" disabled={busy}>{busy ? 'Saving...' : editingId ? 'Save changes' : 'Create promotion'}</button>
             <button type="button" onClick={() => navigateTo('/marketing/promotions')}>Cancel</button>
           </div>
         </form>
@@ -315,7 +382,11 @@ function PromotionsView({ create }) {
                 <tbody>
                   {items.map((promotion) => (
                     <tr key={promotion.id}>
-                      <td>{promotion.name}</td>
+                      <td>
+                        <button type="button" className="table-link" onClick={() => navigateTo(`/marketing/promotions/${promotion.id}`)}>
+                          {promotion.name}
+                        </button>
+                      </td>
                       <td>
                         {promotion.discountType === 'percentage' && `${promotion.discountPercent}%`}
                         {promotion.discountType === 'fixed' && (promotion.discountAmount?.display ?? '—')}
@@ -488,7 +559,14 @@ const VIEW_TITLES = {
 }
 
 export default function SellerMarketing({ view = 'overview' }) {
-  const title = VIEW_TITLES[view] ?? 'Marketing'
+  // `/marketing/coupons/:id` and `/marketing/promotions/:id` reuse the create view (see
+  // App.jsx) rather than a separate route, so the only sign this is an edit is the third path
+  // segment being an id rather than the literal word "create".
+  const pathSegments = typeof window !== 'undefined' ? window.location.pathname.split('/').filter(Boolean) : []
+  const isEditingRoute = pathSegments.length > 2 && pathSegments[2] !== 'create'
+  const title = isEditingRoute && view === 'create-coupon' ? 'Edit Coupon'
+    : isEditingRoute && view === 'create-promotion' ? 'Edit Promotion'
+      : VIEW_TITLES[view] ?? 'Marketing'
 
   return (
     <SellerLayout

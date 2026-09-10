@@ -74,3 +74,77 @@
   .sec-codes ol { grid-template-columns: 1fr; }
   .sec-form.inline { flex-wrap: wrap; }
 }
+
+/* Contact verification.
+   Shared between the storefront account page and the seller panel, so the class names are
+   generic and carry no app-specific chrome — same rule the component itself follows. */
+.verify-panel { display:grid; gap:10px; margin-top:10px; }
+.verify-channel { padding:12px 14px; border:1px solid var(--color-border, #e6e0dc); border-radius:6px; background:#fff; }
+.verify-channel.verified { background:#f7fbf8; border-color:#cfe8d8; }
+.verify-channel-head { display:flex; align-items:center; gap:10px; }
+.verify-channel-icon { display:grid; place-items:center; flex:0 0 30px; height:30px; border-radius:50%;
+  color:var(--color-primary, #c2410c); background:var(--color-primary-light, #fdf1eb); font-size:12px; }
+.verify-channel-head > div { min-width:0; }
+.verify-channel-head b { display:block; font-size:11px; }
+.verify-channel-head small { display:block; margin-top:2px; color:var(--color-text-secondary, #6b6360); font-size:9px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.verify-badge { display:inline-flex; align-items:center; gap:5px; margin-left:auto; flex-shrink:0;
+  padding:4px 9px; border-radius:20px; font-size:8px; font-style:normal; font-weight:700; }
+.verify-badge.on { color:#1c7a45; background:#e8f7ee; }
+.verify-badge.off { color:#9a6b00; background:#fff6e0; }
+.verify-channel-body { margin-top:10px; padding-left:40px; }
+.verify-channel-body p { margin:0 0 9px; color:var(--color-text-secondary, #6b6360); font-size:9px; line-height:1.5; }
+.verify-channel-body button, .verify-panel > button { padding:7px 14px; border:1px solid var(--color-primary, #c2410c);
+  border-radius:4px; color:var(--color-primary, #c2410c); background:#fff; font-size:9px; cursor:pointer; }
+.verify-channel-body button:disabled { opacity:.55; cursor:not-allowed; }
+.verify-secondary { border-color:var(--color-border, #e6e0dc)!important; color:var(--color-text-secondary, #6b6360)!important; }
+.verify-note { margin:0 0 9px; padding-left:40px; color:var(--color-text-secondary, #6b6360); font-size:9px; line-height:1.5; }
+.verify-channel-body .verify-note { padding-left:0; }
+.verify-success { color:#1c7a45; }
+.verify-error { color:var(--color-danger, #c02626); }
+.verify-code-form label span { display:block; margin-bottom:5px; color:var(--color-text-light, #8a807c); font-size:8px; }
+/* Wide letter-spacing because this is read off a text message and typed digit by digit. */
+.verify-code-form input { width:150px; min-height:34px; padding:0 11px; border:1px solid var(--color-border, #e6e0dc);
+  border-radius:4px; outline:0; background:#fff; font:inherit; font-size:14px; letter-spacing:.35em; text-align:center; }
+.verify-code-form input:focus { border-color:var(--color-primary, #c2410c); box-shadow:0 0 0 3px var(--color-primary-light, #fdf1eb); }
+.verify-actions { display:flex; gap:8px; margin-top:10px; }
+@media (max-width:560px) {
+  .verify-channel-body, .verify-note { padding-left:0; }
+  .verify-badge { margin-left:0; }
+  .verify-channel-head { flex-wrap:wrap; }
+  .verify-code-form input { width:100%; }
+  .verify-actions { flex-direction:column; }
+  .verify-actions button { width:100%; }
+}
+
+/* The page the emailed confirmation link lands on. */
+.verify-email-page { display:grid; place-items:center; min-height:100vh; padding:20px; background:var(--color-surface-muted, #faf8f7); }
+.verify-email-card { width:100%; max-width:420px; padding:36px 30px; border:1px solid var(--color-border, #e6e0dc);
+  border-radius:10px; text-align:center; background:#fff; box-shadow:0 6px 24px rgb(0 0 0 / 6%); }
+.verify-email-icon { display:grid; place-items:center; width:56px; height:56px; margin:0 auto 16px; border-radius:50%; font-size:20px; }
+.verify-email-working .verify-email-icon { color:var(--color-primary, #c2410c); background:var(--color-primary-light, #fdf1eb); }
+.verify-email-working .verify-email-icon i { animation:verify-spin 1s linear infinite; }
+.verify-email-done .verify-email-icon { color:#1c7a45; background:#e8f7ee; }
+.verify-email-error .verify-email-icon { color:var(--color-danger, #c02626); background:#fdecec; }
+@keyframes verify-spin { to { transform:rotate(360deg); } }
+.verify-email-card h1 { margin:0 0 10px; font:800 17px var(--font-heading, inherit); }
+.verify-email-card p { margin:0; color:var(--color-text-secondary, #6b6360); font-size:11px; line-height:1.6; }
+.verify-email-actions { display:flex; justify-content:center; gap:10px; margin-top:20px; }
+.verify-email-actions button { padding:9px 16px; border:1px solid var(--color-border, #e6e0dc); border-radius:5px;
+  background:#fff; font-size:10px; cursor:pointer; }
+.verify-email-actions button.primary { border-color:var(--color-primary, #c2410c); color:#fff; background:var(--color-primary, #c2410c); }
+@media (max-width:480px) { .verify-email-actions { flex-direction:column; } .verify-email-actions button { width:100%; } }
+
+/* Two-factor enrolment key — see the storefront note. */
+.sec-key { display:grid; gap:8px; justify-items:start; margin:10px 0 14px; }
+.sec-key-link { display:inline-flex; align-items:center; gap:7px; padding:8px 14px; border:1px solid var(--color-primary, #c2410c); border-radius:5px; color:var(--color-primary, #c2410c); font-size:11px; text-decoration:none; }
+.sec-key-or { margin:0; color:#8a807c; font-size:9px; }
+
+/* Development-only verification disclosure — see the storefront note. */
+.verify-dev { padding:10px 12px; margin:0 0 10px; border:1px dashed #b8a5f0; border-radius:6px; background:#f6f3ff; }
+.verify-dev b { display:flex; align-items:center; gap:6px; font-size:10px; color:#5b3fb5; }
+.verify-dev p { margin:5px 0 8px!important; font-size:9px!important; }
+.verify-dev-label { display:block; margin-bottom:4px; color:#6b6360; font-size:9px; }
+.verify-dev-value { display:block; padding:6px 9px; border-radius:4px; background:#fff; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:11px; word-break:break-all; color:#5b3fb5; }
+.verify-dev button { margin-top:8px; }
+.verify-warn { color:#9a6b00; }

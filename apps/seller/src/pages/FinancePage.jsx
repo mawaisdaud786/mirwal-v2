@@ -8,6 +8,7 @@ import './finance.css'
 import './finance-extra.css'
 import { navigateTo } from '@mirwal/shared/navigation'
 import Icon from '@mirwal/shared/Icon'
+import PayoutAccount from '../components/PayoutAccount'
 
 /**
  * Finance overview and withdrawals were fully fabricated: a Rs. 52,430 "available balance",
@@ -24,8 +25,8 @@ import Icon from '@mirwal/shared/Icon'
  * could move money anywhere — so Withdrawals shows the real balance but keeps the withdrawal
  * action disabled, rather than pretending a request would do anything.
  *
- * `SettingsContent` (payout method, tax info, security) stays exactly as it was: those really
- * are still unbuilt (no payout-method storage, no seller tax-info fields, no 2FA).
+ * `SettingsContent` now carries a real payout account (see components/PayoutAccount.jsx).
+ * Seller tax-info fields remain unbuilt and the page says so rather than drawing them.
  */
 
 const RANGE_OPTIONS = [
@@ -227,8 +228,6 @@ const FinancePage = ({ type = 'overview' }) => {
  * What is here instead is what Mirwal actually does. Two of those things are deliberate
  * absences rather than missing features, and the page says which:
  *
- *  - No saved bank account. Mirwal never stores full bank details; the destination is given
- *    per withdrawal and kept only as a human-readable hint on that payout.
  *  - No payout schedule. Nothing pays out automatically — a seller requests a withdrawal when
  *    they want one, which is why there is a Withdrawals page and no scheduler.
  */
@@ -249,9 +248,9 @@ const SettingsContent = () => {
           </div>
 
           <p className="settings-note">
-            Mirwal never stores your bank details. You choose where the money goes each time you request a
-            withdrawal, and only a short reference is kept against that payout &mdash; so there is nothing
-            saved here to be leaked.
+            Mirwal stores only what a transfer needs &mdash; an account title and an IBAN or wallet number,
+            shown masked. No full account numbers beyond the IBAN itself, and nothing that could be used to
+            take money out.
           </p>
 
           <div className="settings-row">
@@ -276,6 +275,8 @@ const SettingsContent = () => {
             <Icon name="arrow-right" /> Request a withdrawal
           </button>
         </section>
+
+        <PayoutAccount />
 
         <section className="finance-panel settings-card">
           <div className="settings-heading">

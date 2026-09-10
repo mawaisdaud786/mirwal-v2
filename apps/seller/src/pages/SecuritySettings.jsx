@@ -6,6 +6,7 @@ import { navigateTo } from '@mirwal/shared/navigation'
 import Icon from '@mirwal/shared/Icon'
 import api from '../api'
 import './security-settings.css'
+import { VerificationPanel } from '@mirwal/shared/VerificationPanel'
 
 /**
  * Seller account security: password, two-factor, and signed-in devices.
@@ -78,6 +79,26 @@ export default function SecuritySettings() {
           </section>
         )}
 
+        {/*
+          Contact details, ahead of the password card.
+
+          Confirming these is what makes everything below usable: a password reset, a 2FA
+          recovery and every security alert Mirwal sends all go to these addresses. For a
+          seller it is also the gate on applying in the first place.
+        */}
+        <section className="sec-card">
+          <div className="sec-card-head">
+            <span><Icon name="address-card" /></span>
+            <div>
+              <h2>Your contact details</h2>
+              <p>Confirming these lets Mirwal reach you about orders and payouts, reset your password, and recover your account if you lose your phone.</p>
+            </div>
+          </div>
+          <VerificationPanel
+            api={api.auth.verification}
+            phoneHint="Add a mobile number to your account, then come back here to confirm it."
+          />
+        </section>
         <section className="sec-card">
           <div className="sec-card-head">
             <span><Icon name="key" /></span>
@@ -151,7 +172,23 @@ export default function SecuritySettings() {
           ) : enrolment ? (
             <div className="sec-enrol">
               <p className="sec-note">Add this key to your authenticator app, then enter the code it shows.</p>
-              <code className="sec-secret">{enrolment.secret}</code>
+              {/*
+                The API has returned `otpauthUri` alongside the secret since migration 018 and
+                this panel ignored it, showing only a 32-character base32 string to be typed by
+                hand into a phone. That is where enrolment goes wrong: one mistyped character
+                produces codes that never match, and it looks like a broken feature rather than
+                a typo. On a phone the link opens the authenticator directly; on a desktop the
+                grouped key is what an authenticator expects for manual entry.
+              */}
+              <div className="sec-key">
+                {enrolment.otpauthUri && (
+                  <a className="sec-key-link" href={enrolment.otpauthUri}>
+                    <Icon name="mobile-screen" /> Open in my authenticator app
+                  </a>
+                )}
+                <p className="sec-key-or">or enter the key by hand</p>
+                <code className="sec-secret">{String(enrolment.secret).replace(/(.{4})/g, '$1 ').trim()}</code>
+              </div>
               <form
                 className="sec-form inline"
                 onSubmit={async (event) => {

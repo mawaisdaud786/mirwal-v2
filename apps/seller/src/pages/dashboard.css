@@ -7,6 +7,12 @@
 .dashboard-date .fa-solid { color: var(--color-text-secondary); }
 
 .dashboard-metrics { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.dashboard-highlight-row { display:grid; grid-template-columns:minmax(180px,.8fr) minmax(0,2.2fr); gap:12px; }
+.dashboard-growth-callout { display:flex; align-items:center; justify-content:space-between; gap:20px; min-width:0; padding:18px 22px; border:1px solid #ffd0bd; border-radius:var(--radius-xl); background:linear-gradient(110deg,#fff5ed,#fffaf7); }
+.dashboard-growth-callout strong { color:#e85a2b; font:800 19px var(--font-heading); }
+.dashboard-growth-callout p { max-width:520px; margin:5px 0 0; color:#625851; font-size:13px; line-height:1.45; }
+.dashboard-growth-callout button { display:inline-flex; align-items:center; gap:8px; flex:0 0 auto; padding:10px 15px; border:0; border-radius:7px; color:#fff; background:#f26b38; font-size:13px; font-weight:700; transition:transform .18s ease,background-color .18s ease,box-shadow .18s ease; }
+.dashboard-growth-callout button:hover { background:#e6521f; box-shadow:0 6px 14px rgba(242,107,56,.22); transform:translateY(-1px); }
 .dashboard-metric, .dashboard-panel { border: 1px solid var(--color-border-light); border-radius: var(--radius-xl); background: #fff; box-shadow: 0 2px 8px rgba(40, 30, 20, .04); }
 .dashboard-metric { padding: 14px; min-height: 100px; }
 .dashboard-metric-top { display: flex; align-items: center; justify-content: space-between; color: var(--color-text); font-size: var(--font-size-2xl); }
@@ -19,6 +25,7 @@
 .dashboard-metrics .dashboard-metric:nth-child(3) .dashboard-metric-top i { color: #9149e8; background: #f3eaff; }
 .dashboard-metrics .dashboard-metric:nth-child(4) .dashboard-metric-top i { color: #3fa34d; background: #eaf8eb; }
 .dashboard-metrics .dashboard-metric:nth-child(5) .dashboard-metric-top i { color: #ff9d00; background: #fff8e9; }
+.dashboard-rating-metric .dashboard-metric-top i { color:#25a77a; background:#e7f8ef; }
 
 .dashboard-columns { display: grid; grid-template-columns: 1.45fr .95fr; gap: 14px; }
 .dashboard-bottom { display: grid; grid-template-columns: 1fr; gap: 14px; min-height: 216px; }
@@ -51,12 +58,16 @@
 .dashboard-order em.cancelled { color: var(--color-danger); background: #fff0ef; }
 .dashboard-order > strong { font-size: var(--font-size-xl); }
 
-.top-product { display: grid; grid-template-columns: 18px 30px 1fr auto auto; align-items: center; gap: 8px; padding: 9px 0; border-top: 1px solid var(--color-border-light); min-height: 30px; }
-.top-product > b { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; color: #fff; background: var(--color-primary); font-size: var(--font-size-base); }
-.top-product > span.product-avatar { display: grid; place-items: center; width: 30px; height: 30px; border-radius: var(--radius-sm); background: #f3f3f3; font-size: 15px; }
+/* Four real columns for four real children: rank chip, avatar, name+price, rating.
+   (This used to declare a fifth, unused column too — a leftover from before the avatar
+   span existed in JSX at all, when the grid still had to be guessed at rather than measured.) */
+.top-product { display: grid; grid-template-columns: 22px 32px 1fr auto; align-items: center; gap: 10px; padding: 10px 2px; border-top: 1px solid var(--color-border-light); min-height: 30px; }
+.top-product > b { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; color: #fff; background: var(--color-primary); font-size: 11px; font-weight: 700; }
+.top-product > span.product-avatar { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: #f3f3f3; font-size: 14px; }
 .top-product strong, .top-product small { display: block; }
-.top-product strong { font-size: var(--font-size-xl); }
+.top-product strong { overflow: hidden; font-size: var(--font-size-xl); text-overflow: ellipsis; white-space: nowrap; }
 .top-product small { color: var(--color-text-secondary); font-size: var(--font-size-lg); }
+.top-product > small:last-child { white-space: nowrap; }
 
 @media (max-width: 1100px) {
   .dashboard-metrics { grid-template-columns: repeat(3, 1fr); }
@@ -67,6 +78,8 @@
   .dashboard-title-row { display: block; }
   .dashboard-date { margin-top: 10px; }
   .dashboard-metrics { grid-template-columns: repeat(2, 1fr); }
+  .dashboard-highlight-row { grid-template-columns:1fr; }
+  .dashboard-growth-callout { align-items:flex-start; flex-direction:column; gap:14px; }
   .dashboard-columns, .dashboard-bottom { grid-template-columns: 1fr; }
   .chart-lines { min-width: 0; }
 }
@@ -83,3 +96,81 @@
 .dashboard-sales-kpis small { display: block; color: var(--color-text-secondary); font-size: 11.5px; }
 .dashboard-sales-kpis strong { display: block; margin-top: 6px; font: 800 18px var(--font-heading); }
 @media (max-width: 700px) { .dashboard-sales-kpis { grid-template-columns: 1fr; } }
+
+/* Dashboard visual polish. */
+.dashboard-container { gap:20px; }
+.dashboard-title-row h1 { color:#1e1713; letter-spacing:-.025em; }
+.dashboard-title-row p { line-height:1.5; }
+.dashboard-metric,.dashboard-panel { border-color:#dbe9f3; box-shadow:0 4px 14px rgba(20,60,95,.06); transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease; }
+.dashboard-metric:hover,.dashboard-panel:hover { border-color:#bcdcf2; box-shadow:0 9px 22px rgba(20,60,95,.1); transform:translateY(-2px); }
+.dashboard-metric { padding:16px; }
+.dashboard-metric-top { gap:10px; line-height:1.35; }
+.dashboard-metric-top span { min-width:0; }
+.dashboard-metric-top i { flex:0 0 40px; width:40px; height:40px; }
+.dashboard-metrics .dashboard-metric:nth-child(6) .dashboard-metric-top i { color:#e05a8a; background:#fff0f5; }
+.dashboard-panel { padding:18px; }
+.dashboard-panel-heading { margin-bottom:16px; }
+.dashboard-panel-heading h2 { color:#211914; font-size:18px; letter-spacing:-.015em; }
+.dashboard-panel-heading button { transition:color .18s ease,background-color .18s ease,border-color .18s ease; }
+.dashboard-panel-heading button:hover { color:var(--color-primary); border-color:var(--color-primary-light); background:#fbfdff; }
+.dashboard-order,.top-product { transition:background-color .18s ease,padding-left .18s ease; }
+.dashboard-order:hover,.top-product:hover { background:#f5faff; padding-left:6px; }
+.dashboard-order > span.order-avatar,.top-product > span.product-avatar { color:#f26b38; background:#fff0e7; }
+.dashboard-sales-kpis > div { border-color:#dbe9f3; background:#f5faff; }
+.dashboard-sales-kpis > div:nth-child(2) { background:#f5f2ff; }
+.dashboard-sales-kpis > div:nth-child(3) { background:#eef9f4; }
+@media (max-width:800px) {
+  .dashboard-container { gap:16px; }
+  .dashboard-metric,.dashboard-panel { transform:none; }
+  .dashboard-metric:hover,.dashboard-panel:hover { transform:none; }
+}
+
+/* ============================================================================
+   Real trend badges and a real sales chart — CSS for data the finance endpoint
+   already returned (changePercent, revenueTrend) that nothing on this page used
+   to draw. See the doc comment at the top of SellerDashboard.jsx.
+   ============================================================================ */
+
+/* KPI icon badges: rounded squares rather than circles — reads less like a generic
+   avatar and more like a stat tile. Wins the cascade over the two earlier rules
+   that only set size/color, matching this file's own additive-override convention. */
+.dashboard-metric-top i,
+.dashboard-metrics .dashboard-metric .dashboard-metric-top i { border-radius: 12px; }
+.dashboard-metric, .dashboard-panel { border-radius: var(--radius-5xl); }
+
+.dashboard-trend { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; font-size: 11.5px; font-weight: 700; }
+.dashboard-trend small { color: var(--color-text-muted); font-size: 10.5px; font-weight: 500; }
+.dashboard-trend.up { color: var(--color-success-dark); }
+.dashboard-trend.down { color: var(--color-danger); }
+.dashboard-trend.flat { color: var(--color-text-muted); }
+
+/* Sales KPI tiles: an icon badge per tile, matching the family used up top. */
+.dashboard-sales-kpis > div { position: relative; padding-right: 44px; }
+.dashboard-sales-kpi-icon { position: absolute; top: 10px; right: 10px; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; font-size: 12px; }
+.dashboard-sales-kpis > div:nth-child(1) .dashboard-sales-kpi-icon { color: #e05a1f; background: #ffe4d3; }
+.dashboard-sales-kpis > div:nth-child(2) .dashboard-sales-kpi-icon { color: #6a4fd6; background: #e6e0fb; }
+.dashboard-sales-kpis > div:nth-child(3) .dashboard-sales-kpi-icon { color: #1f8a5a; background: #d9f3e6; }
+
+/* The chart itself, sitting under the three tiles. */
+.dashboard-chart { margin-top: 16px; }
+.dashboard-chart svg { display: block; width: 100%; height: 96px; }
+.dashboard-chart-labels { display: flex; justify-content: space-between; margin-top: 6px; color: var(--color-text-muted); font-size: 10.5px; }
+
+/* The growth banner: a soft medallion instead of bare text, so the panel doesn't
+   read as an empty gradient with a button parked at the end of it. */
+.dashboard-growth-callout { position: relative; overflow: hidden; }
+.dashboard-growth-icon { display: grid; flex: 0 0 46px; place-items: center; width: 46px; height: 46px; margin-right: 4px; border-radius: 50%; color: #fff; background: linear-gradient(135deg, #ff8a4c, #f0501f); font-size: 18px; box-shadow: 0 6px 16px rgba(240, 80, 31, .3); }
+.dashboard-growth-callout > div:first-of-type { display: flex; align-items: center; gap: 14px; min-width: 0; }
+
+@media (max-width: 800px) {
+  .dashboard-sales-kpis > div { padding-right: 12px; }
+  .dashboard-sales-kpi-icon { position: static; margin-bottom: 6px; }
+  .dashboard-growth-icon { display: none; }
+}
+
+/* The shared `.product-thumb` (seller-components.css) defaults to 36px for the table rows it
+   was built for; these two widgets size their avatar column at 30-32px to match the row
+   height they already had, so the real photo is scaled down to fit rather than the column
+   being widened around it. */
+.dashboard-order > .product-thumb { width: 30px; height: 30px; border-radius: var(--radius-sm); }
+.top-product > .product-thumb { width: 32px; height: 32px; border-radius: 9px; }

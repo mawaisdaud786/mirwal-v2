@@ -34,6 +34,10 @@ export const StatCard = ({ label, value, icon, change, isNegative }) => {
 // Data Table Component
 export const DataTable = ({ columns, data, actions }) => {
   return (
+    // A table with enough columns (Customers: name, email, orders, spend, last order) has no
+    // graceful way to shrink on a narrow phone screen — this scrolls the table horizontally
+    // inside its own box instead of forcing the whole page to.
+    <div className="data-table-wrap">
     <table className="data-table">
       <thead>
         <tr>
@@ -83,6 +87,7 @@ export const DataTable = ({ columns, data, actions }) => {
         )}
       </tbody>
     </table>
+    </div>
   )
 }
 

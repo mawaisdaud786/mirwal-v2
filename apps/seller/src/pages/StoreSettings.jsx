@@ -35,11 +35,11 @@ const quickAccessItems = [
 
 function StoreSettings() {
   const { data: store } = useApiQuery((signal) => api.seller.store(signal), [])
-  const { data: products } = useApiQuery((signal) => api.seller.products(signal), [])
+  const { data: products } = useApiQuery((signal) => api.seller.products({ pageSize: 100 }, signal), [])
   // Real trading figures, replacing a panel that said orders were not connected. The same
   // endpoint Finance uses, over all time rather than a window.
   const finance = useApiQuery((signal) => api.seller.finance({ range: 'all' }, signal), [])
-  const items = products ?? []
+  const items = products?.items ?? []
   const rated = items.filter((p) => p.rating.count > 0)
   const totalReviews = rated.reduce((sum, p) => sum + p.rating.count, 0)
   const avgRating = rated.length ? (rated.reduce((sum, p) => sum + p.rating.average * p.rating.count, 0) / totalReviews).toFixed(1) : null

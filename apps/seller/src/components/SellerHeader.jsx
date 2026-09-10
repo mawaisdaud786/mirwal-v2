@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { navigateTo } from '@mirwal/shared/navigation'
 import { useSellerSession } from '../SellerSession'
 import { useApiQuery, describeApiError } from '@mirwal/shared/useApiQuery'
@@ -26,12 +26,31 @@ const SellerHeader = ({ storeName, breadcrumbs, onMenu }) => {
   const [loggingOut, setLoggingOut] = useState(false)
   const [logoutError, setLogoutError] = useState('')
   const headerRef = useRef(null)
+  const searchRef = useRef(null)
 
   useEffect(() => {
     const close = (event) => { if (!headerRef.current?.contains(event.target)) setMenu(null) }
     document.addEventListener('mousedown', close)
     return () => document.removeEventListener('mousedown', close)
   }, [])
+
+  /**
+   * Cmd/Ctrl+K focuses search, matching the shortcut chip drawn in the box. Skipped while the
+   * shopper is already typing somewhere else — the shortcut fires on this page, not mid-form.
+   */
+  const focusSearch = useCallback((event) => {
+    const typing = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName) || document.activeElement?.isContentEditable
+    if (typing && document.activeElement !== searchRef.current) return
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+      event.preventDefault()
+      searchRef.current?.focus()
+      searchRef.current?.select()
+    }
+  }, [])
+  useEffect(() => {
+    document.addEventListener('keydown', focusSearch)
+    return () => document.removeEventListener('keydown', focusSearch)
+  }, [focusSearch])
 
   const items = notifications ?? []
   const unread = items.filter((item) => !item.read).length
@@ -67,12 +86,19 @@ const SellerHeader = ({ storeName, breadcrumbs, onMenu }) => {
       </nav>}
       <label className="seller-search-box">
         <span className="seller-search-icon"><i className="fa-solid fa-magnifying-glass" aria-hidden="true" /></span>
-        <input type="text" placeholder="Search orders, products, customers…" aria-label="Search seller dashboard" onKeyDown={(event) => event.key === 'Enter' && navigateTo(`/products?search=${encodeURIComponent(event.currentTarget.value)}`)} />
+        <input
+          ref={searchRef}
+          type="text"
+          placeholder="Search orders, products, customers…"
+          aria-label="Search seller dashboard"
+          onKeyDown={(event) => event.key === 'Enter' && navigateTo(`/products?search=${encodeURIComponent(event.currentTarget.value)}`)}
+        />
+        <kbd className="seller-search-kbd">{navigator.platform?.includes('Mac') ? '⌘K' : 'Ctrl K'}</kbd>
       </label>
     </div>
 
     <div className="seller-header-right">
-      <button className="seller-header-action-btn" type="button" title="View your public store" onClick={() => navigateTo('/store')}>
+      <button className="seller-header-action-btn seller-view-store-btn" type="button" title="View your public store" onClick={() => navigateTo('/store')}>
         <i className="fa-solid fa-eye" aria-hidden="true" /><span className="seller-view-store-label">View Store</span>
       </button>
 

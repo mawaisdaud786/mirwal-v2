@@ -26,8 +26,16 @@ const SellerLayout = ({ children, activeItem, breadcrumbs }) => {
   const { data: store } = useApiQuery((signal) => api.seller.store(signal), [])
   // Real count for the sidebar's "Orders" badge — it previously hard-coded 24 regardless of
   // how many orders (or whether any order at all) the signed-in seller actually had.
-  const { data: orderItems } = useApiQuery((signal) => api.seller.orders(signal), [])
-  const openOrderCount = orderItems?.filter((item) => !['delivered', 'cancelled'].includes(item.status)).length
+  /**
+    * A count, asked for as a count.
+    *
+    * This used to fetch every order line the store had ever sold and take the length of a
+    * filter over it — the whole history downloaded on every page load to render one badge.
+    */
+  const { data: orderCounts } = useApiQuery((signal) => api.seller.orderCounts(signal), [])
+  const openOrderCount = orderCounts
+    ? (orderCounts.all ?? 0) - (orderCounts.delivered ?? 0) - (orderCounts.cancelled ?? 0)
+    : undefined
   if (isNested) return children
 
   const handleNavigation = (path) => navigateTo(path)

@@ -121,13 +121,16 @@
 }
 
 /* Data Table */
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: #fff;
+.data-table-wrap {
+  overflow-x: auto;
   border: 1px solid var(--color-border-light);
   border-radius: 8px;
-  overflow: hidden;
+}
+.data-table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  background: #fff;
 }
 
 .data-table thead {
@@ -388,6 +391,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
   margin-top: 20px;
   padding-top: 16px;
   border-top: 1px solid var(--color-border-lightest);
@@ -402,7 +407,21 @@
 .pagination-controls {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+/**
+ * Below this width `.pagination-controls` (a rows-per-page select, prev/next and up to five
+ * page-number buttons) is wider than the row it sits in. `justify-content: space-between` with
+ * no wrap does not shrink the controls to fit — it lets them run off the right edge of the
+ * screen, so a store with enough orders to reach page 6 had no way to tap page 6 on a phone.
+ * Stacking the two halves, and letting the buttons themselves wrap, keeps every control
+ * reachable regardless of how many pages exist.
+ */
+@media (max-width: 640px) {
+  .pagination { flex-direction: column; align-items: stretch; }
+  .pagination-controls { justify-content: center; }
 }
 
 .pagination-select {
@@ -541,3 +560,21 @@
   border-color: var(--color-primary);
   color: var(--color-primary);
 }
+
+/**
+ * A real product thumbnail, used by every list that shows a product or order line (My
+ * Products, Orders, and the two dashboard widgets). Shared here rather than duplicated per
+ * page CSS file because all four need the exact same cell: a small rounded image, or a plain
+ * placeholder box when the product genuinely has none — never a broken `<img>` with no `src`.
+ */
+.product-cell { display: flex; align-items: center; gap: 10px; }
+.product-thumb { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; flex: 0 0 36px; background: var(--color-surface-soft); }
+.product-thumb-empty { display: grid; place-items: center; color: var(--color-text-muted); font-size: 14px; }
+
+/**
+ * A table cell that opens something — a product, an order, a coupon code. Shared for the same
+ * reason `.product-thumb` is: each page's CSS is its own Vite chunk, so a class three different
+ * pages use has to live where every page actually loads it.
+ */
+.table-link { padding: 0; border: 0; background: none; color: var(--color-primary, #e8683c); font: inherit; text-align: left; cursor: pointer; }
+.table-link:hover { text-decoration: underline; }

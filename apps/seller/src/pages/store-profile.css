@@ -841,3 +841,28 @@
     flex: 1;
   }
 }
+
+/* Save feedback. Replaces the alert() that admitted nothing was persisted. */
+.store-flash { margin:0 0 14px; padding:9px 12px; border-radius:5px; font-size:11px; line-height:1.5; }
+.store-flash-success { color:#1c7a45; background:#e8f7ee; border:1px solid #cfe8d8; }
+.store-flash-error { color:#c02626; background:#fdecec; border:1px solid #f5cccc; }
+.store-flash-info { color:#6b6360; background:#f6f4f3; border:1px solid #e6e0dc; }
+
+/* Policies and hours. The policy tab previously rendered six free-text blocks that were never
+   stored; these are the fields `store_policies` actually enforces. */
+.policy-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; }
+.policy-field.wide, .policy-fields > .wide { grid-column:1/-1; }
+.policy-field span, .policy-toggle b { display:block; margin-bottom:5px; font-size:11px; font-weight:600; }
+.policy-field input, .policy-field select, .policy-field textarea { width:100%; min-height:34px; padding:8px 10px; border:1px solid var(--color-border,#e6e0dc); border-radius:4px; outline:0; background:#fff; font:inherit; font-size:11px; }
+.policy-field small, .policy-toggle small { display:block; margin-top:5px; color:#8a807c; font-size:9px; line-height:1.5; }
+.policy-toggle { display:flex; gap:9px; align-items:flex-start; grid-column:1/-1; padding:10px 12px; border:1px solid var(--color-border,#e6e0dc); border-radius:6px; }
+.policy-toggle input { margin-top:2px; }
+.panel-actions { margin-top:16px; }
+.panel-note { margin:4px 0 0; color:#8a807c; font-size:10px; }
+.hours-list { display:grid; gap:8px; }
+.hours-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:9px 12px; border:1px solid var(--color-border,#e6e0dc); border-radius:6px; }
+.hours-day { display:flex; align-items:center; gap:8px; font-size:11px; }
+.hours-times { display:flex; align-items:center; gap:7px; font-size:10px; color:#6b6360; }
+.hours-times input { min-height:30px; padding:0 8px; border:1px solid var(--color-border,#e6e0dc); border-radius:4px; font:inherit; font-size:10px; }
+.hours-closed { color:#8a807c; font-size:10px; }
+@media (max-width:560px){ .hours-row { flex-direction:column; align-items:stretch; } }

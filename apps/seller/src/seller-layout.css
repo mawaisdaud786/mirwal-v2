@@ -8,10 +8,34 @@
    for a premium, spacious dashboard rather than a cramped admin template.
    ============================================================================ */
 
-.seller-container { display: flex; height: 100vh; background: var(--color-surface-soft); }
+/**
+ * A seller-scoped re-theme, not a global one.
+ *
+ * `--color-surface-soft` and the `--color-border*` tokens are shared with admin and the
+ * storefront (packages/shared/styles/global.css), so redefining them there would re-skin all
+ * three apps for one. Every seller page already sources its "soft surface" fills, table-header
+ * tints, hover backgrounds and card borders through these same variables — because
+ * `.seller-container` is the one wrapper every seller page renders inside (SellerLayout.jsx),
+ * redeclaring them here cascades a single light, cool palette to the whole panel without
+ * touching the file that admin and the storefront read from.
+ *
+ * The warm cream/peach values these replace read as "dark" next to white cards because cream
+ * and white sit close in lightness with little contrast; a light sky blue reads as airier at
+ * the same lightness because blue against white is a hue shift, not just a tint.
+ */
+.seller-container {
+  --color-surface-soft: #eaf4fb;
+  --color-surface-lightest: #f4f9fd;
+  --color-border: #dceaf3;
+  --color-border-light: #e3eef6;
+  --color-border-lighter: #dfebf4;
+  --color-border-lightest: #e8f1f8;
+
+  display: flex; height: 100vh; background: var(--color-surface-soft);
+}
 
 /* ---- Sidebar ---- */
-.seller-sidebar { display: flex; flex-direction: column; flex: 0 0 224px; width: 224px; background: var(--color-surface); color: var(--color-text); border-right: 1px solid var(--color-border-light); overflow: hidden; transition: width var(--transition-normal), flex-basis var(--transition-normal); }
+.seller-sidebar { display: flex; flex-direction: column; flex: 0 0 240px; width: 240px; background: var(--color-surface); color: var(--color-text); border-right: 1px solid var(--color-border-light); overflow: hidden; transition: width var(--transition-normal), flex-basis var(--transition-normal); }
 .seller-sidebar.collapsed { flex-basis: 72px; width: 72px; }
 .seller-sidebar.collapsed .seller-brand-content,
 .seller-sidebar.collapsed .seller-store-badge-text,
@@ -31,9 +55,9 @@
 .seller-collapse-btn:hover { color: var(--color-primary); background: var(--color-primary-lighter); }
 .seller-close-btn { display: none; }
 
-.seller-store-badge { display: flex; align-items: center; gap: 10px; width: calc(100% - 24px); margin: 14px 12px 8px; padding: 10px; border: 0; border-radius: var(--radius-xl); background: var(--color-primary-lighter); text-align: left; cursor: pointer; transition: background var(--transition-fast); }
+.seller-store-badge { display: flex; align-items: center; gap: 9px; width: calc(100% - 20px); margin: 14px 10px 8px; padding: 9px 10px; border: 0; border-radius: var(--radius-xl); background: var(--color-primary-lighter); text-align: left; cursor: pointer; transition: background var(--transition-fast); }
 .seller-store-badge:hover { background: var(--color-primary-light); }
-.seller-store-badge > span { display: grid; flex: 0 0 32px; place-items: center; width: 32px; height: 32px; border-radius: 50%; color: #fff; background: var(--color-primary); font-size: 13px; }
+.seller-store-badge > span { display: grid; flex: 0 0 28px; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: #fff; background: var(--color-primary); font-size: 12px; }
 .seller-store-badge-text, .seller-store-badge > div { min-width: 0; }
 .seller-store-badge b { display: block; overflow: hidden; font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .seller-store-badge small { display: inline-block; margin-top: 3px; padding: 1px 6px; border-radius: var(--radius-pill); color: var(--color-success-dark); background: var(--color-success-light); font-size: 11px; font-weight: 600; }
@@ -44,7 +68,7 @@
 .seller-nav-section h2 { margin: 6px 8px 5px; color: var(--color-text-muted); font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
 .seller-nav-item { display: flex; align-items: center; gap: 11px; width: 100%; padding: 9px 10px; border: 0; border-radius: var(--radius-lg); color: var(--color-text-secondary); background: none; font-size: 13.5px; font-weight: 500; text-align: left; transition: background var(--transition-fast), color var(--transition-fast); }
 .seller-nav-item:hover { color: var(--color-text); background: var(--color-surface-soft); }
-.seller-nav-item.active { color: var(--color-primary); background: var(--color-primary-light); font-weight: 700; }
+.seller-nav-item.active { position: relative; color: var(--color-primary); background: var(--color-primary-light); font-weight: 700; box-shadow: inset 3px 0 0 var(--color-primary); }
 .seller-nav-item > i { width: 16px; flex: 0 0 16px; color: var(--color-text-muted); text-align: center; font-size: 14px; }
 .seller-nav-item.active > i, .seller-nav-item:hover > i { color: var(--color-primary); }
 .seller-nav-item span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -71,12 +95,15 @@
 .seller-search-box { display: flex; align-items: center; gap: 9px; flex: 1; max-width: 340px; height: 38px; padding: 0 13px; border: 1px solid var(--color-border); border-radius: var(--radius-pill); color: var(--color-text-muted); background: var(--color-surface-soft); transition: border-color var(--transition-fast), box-shadow var(--transition-fast); }
 .seller-search-box:focus-within { border-color: var(--color-primary); background: var(--color-surface); box-shadow: 0 0 0 3px var(--color-primary-light); }
 .seller-search-box input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--color-text); font: inherit; font-size: 13px; }
+.seller-search-kbd { flex: 0 0 auto; padding: 2px 6px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); color: var(--color-text-muted); background: var(--color-surface); font-size: 10.5px; font-weight: 700; letter-spacing: .02em; }
 .seller-search-icon { font-size: 13px; }
 
 .seller-header-right { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 .seller-header-action-btn { position: relative; display: grid; place-items: center; width: 38px; height: 38px; border: 0; border-radius: 50%; color: var(--color-text-secondary); background: none; font-size: 16px; transition: background var(--transition-fast), color var(--transition-fast); }
 .seller-header-action-btn:hover { color: var(--color-text); background: var(--color-surface-soft); }
-.seller-view-store-label { margin-left: 7px; font-size: 12.5px; font-weight: 600; }
+.seller-view-store-label { margin-left: 7px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.seller-header-action-btn.seller-view-store-btn { width: auto; height: 36px; padding: 0 14px 0 13px; border: 1px solid var(--color-border); border-radius: var(--radius-pill); background: var(--color-surface); }
+.seller-header-action-btn.seller-view-store-btn:hover { color: var(--color-primary); border-color: var(--color-primary-light); background: var(--color-primary-lighter); }
 .seller-header-action-badge { position: absolute; top: 2px; right: 2px; display: grid; place-items: center; min-width: 16px; height: 16px; padding: 0 3px; border: 2px solid var(--color-surface); border-radius: var(--radius-pill); color: #fff; background: var(--color-danger); font-size: 10px; font-weight: 700; }
 
 .seller-header-dropdown-wrap { position: relative; }
@@ -124,11 +151,12 @@
 .seller-btn-secondary:disabled, .seller-btn-danger:disabled { opacity: .6; cursor: not-allowed; }
 
 /* ---- Content frame ---- */
-.seller-content { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 24px 28px 40px; }
+.seller-content { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 24px 28px 40px; scrollbar-width:none; -ms-overflow-style:none; }
+.seller-content::-webkit-scrollbar { display:none; }
 
 /* ---- Responsive ---- */
 @media (max-width: 1200px) {
-  .seller-sidebar { flex-basis: 200px; width: 200px; }
+  .seller-sidebar { flex-basis: 212px; width: 212px; }
   .seller-content { padding: 20px 22px 32px; }
 }
 
@@ -142,7 +170,15 @@
   .seller-header { height: auto; min-height: 64px; padding: 10px 16px; gap: 10px; }
   .seller-breadcrumb { display: none; }
   .seller-search-box { max-width: none; }
+  /* A keyboard-shortcut hint is meaningless on a touchscreen, and at this width it was the
+     difference between the search box fitting its own row and crowding into the action icons
+     beside it. */
+  .seller-search-kbd { display: none; }
   .seller-view-store-label { display: none; }
+  /* The label above is hidden, but the button itself kept its desktop padding — sized to wrap
+     text that is no longer there — so it rendered as an oddly wide pill still fighting the
+     search box and the bell/avatar for the same row. Icon-only sizing matches its neighbours. */
+  .seller-header-action-btn.seller-view-store-btn { width: 38px; padding: 0; }
   .seller-user-info { display: none; }
   .seller-content { padding: 16px 16px 28px; }
 }

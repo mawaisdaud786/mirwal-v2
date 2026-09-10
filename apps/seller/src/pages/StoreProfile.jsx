@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import SellerLayout from '../SellerLayout'
 import { navigateTo } from '@mirwal/shared/navigation'
-import { useApiQuery } from '@mirwal/shared/useApiQuery'
+import { useApiQuery, describeApiError } from '@mirwal/shared/useApiQuery'
 import api from '../api'
 import './store-profile.css'
 
@@ -27,15 +27,6 @@ const initialProfile = {
   publicUrl: 'https://mirwal.pk/stores/mirwal-store',
   status: 'Active',
 }
-
-const initialPolicies = [
-  { key: 'return', label: 'Return Policy', enabled: true, updated: 'Jul 10, 2026', content: 'We accept returns within 7 days for unused items in original condition.' },
-  { key: 'refund', label: 'Refund Policy', enabled: true, updated: 'Jul 10, 2026', content: 'Refunds are processed within 5–7 business days after approval.' },
-  { key: 'cancellation', label: 'Cancellation Policy', enabled: true, updated: 'Jul 08, 2026', content: 'Orders can be cancelled before shipment, or within 2 hours of confirmation.' },
-  { key: 'shipping', label: 'Shipping Policy', enabled: true, updated: 'Jul 04, 2026', content: 'Delivery is available across Pakistan with standard, express and pickup options.' },
-  { key: 'privacy', label: 'Privacy Policy', enabled: true, updated: 'Jun 29, 2026', content: 'We protect buyer and seller information and use data only for store operations.' },
-  { key: 'terms', label: 'Terms & Conditions', enabled: true, updated: 'Jun 21, 2026', content: 'By shopping with us, customers agree to our service and delivery conditions.' },
-]
 
 const initialHours = [
   { day: 'Monday', open: true, start: '09:00', end: '18:00' },
@@ -71,18 +62,43 @@ const statusClassMap = {
 
 function StoreProfile({ page = 'information' }) {
   const currentPage = page || 'information'
-  const { data: store } = useApiQuery((signal) => api.seller.store(signal), [])
-  const { data: sellerProducts } = useApiQuery((signal) => api.seller.products(signal), [])
-  const items = sellerProducts ?? []
+  const { data: store, refetch: refetchStore } = useApiQuery((signal) => api.seller.store(signal), [])
+  const { data: sellerProducts } = useApiQuery((signal) => api.seller.products({ pageSize: 100 }, signal), [])
+  const items = sellerProducts?.items ?? []
   const rated = items.filter((p) => p.rating.count > 0)
   const totalReviews = rated.reduce((sum, p) => sum + p.rating.count, 0)
   const avgRating = rated.length ? (rated.reduce((sum, p) => sum + p.rating.average * p.rating.count, 0) / totalReviews).toFixed(1) : null
 
   const [draft, setDraft] = useState({})
-  const [policies, setPolicies] = useState(initialPolicies)
+  const policiesQuery = useApiQuery((signal) => api.seller.policies.get(signal), [])
+  /**
+   * The saved policies, with the seller's unsaved edits layered on top.
+   *
+   * Same pattern as the profile draft above: no effect syncing fetched data into state, which
+   * would need a setState-on-load and re-render cascade. Reading through to the query result
+   * means the form shows real values the moment they arrive.
+   */
+  const [policyDraft, setPolicyDraft] = useState({})
+  const policyForm = {
+    returnsAccepted: policiesQuery.data?.returnsAccepted ?? true,
+    returnWindowDays: policiesQuery.data?.returnWindowDays ?? null,
+    returnShippingPaidBy: policiesQuery.data?.returnShippingPaidBy ?? 'buyer',
+    exchangeOffered: policiesQuery.data?.exchangeOffered ?? false,
+    dispatchDays: policiesQuery.data?.dispatchDays ?? null,
+    returnsText: policiesQuery.data?.returnsText ?? '',
+    shippingText: policiesQuery.data?.shippingText ?? '',
+    warrantyText: policiesQuery.data?.warrantyText ?? '',
+    ...policyDraft,
+  }
+  const updatePolicy = (field, value) => {
+    setPolicyDraft((current) => ({ ...current, [field]: value }))
+    setDirty(true)
+  }
   const [hours, setHours] = useState(initialHours)
   const [seo, setSeo] = useState(initialSeo)
   const [dirty, setDirty] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [flash, setFlash] = useState(null)
 
   // The editable draft starts empty and falls back to the real store record for display —
   // once the seller edits a field, their draft value takes over from there. This avoids
@@ -94,6 +110,17 @@ function StoreProfile({ page = 'information' }) {
     ...initialProfile,
     ...draft,
     storeName: draft.storeName ?? store?.name ?? initialProfile.storeName,
+    shortDescription: draft.shortDescription ?? store?.description ?? initialProfile.shortDescription,
+    about: draft.about ?? store?.about ?? initialProfile.about,
+    supportEmail: draft.supportEmail ?? store?.support?.email ?? initialProfile.supportEmail,
+    supportPhone: draft.supportPhone ?? store?.support?.phone ?? initialProfile.supportPhone,
+    addressLine1: draft.addressLine1 ?? store?.address?.line1 ?? initialProfile.addressLine1,
+    addressLine2: draft.addressLine2 ?? store?.address?.line2 ?? initialProfile.addressLine2,
+    city: draft.city ?? store?.address?.city ?? initialProfile.city,
+    province: draft.province ?? store?.address?.province ?? initialProfile.province,
+    postalCode: draft.postalCode ?? store?.address?.postalCode ?? initialProfile.postalCode,
+    logoUrl: draft.logoUrl ?? store?.logoUrl ?? null,
+    bannerUrl: draft.bannerUrl ?? store?.bannerUrl ?? null,
     handle: draft.handle ?? store?.slug ?? initialProfile.handle,
     status: draft.status ?? store?.status ?? initialProfile.status,
     publicUrl: draft.publicUrl ?? (store?.slug ? `${window.location.origin}/seller/${store.slug}` : initialProfile.publicUrl),
@@ -129,13 +156,11 @@ function StoreProfile({ page = 'information' }) {
     setDirty(true)
   }
 
-  const updatePolicy = (key, field, value) => {
-    setPolicies((current) => current.map((item) => item.key === key ? { ...item, [field]: value } : item))
-    setDirty(true)
-  }
-
   const updateHours = (day, field, value) => {
     setHours((current) => current.map((item) => item.day === day ? { ...item, [field]: value } : item))
+    // Distinguishes "the seller edited hours" from "the form rendered its defaults", so
+    // opening the tab and saving cannot overwrite stored hours with placeholder values.
+    setDraft((current) => ({ ...current, hoursTouched: true }))
     setDirty(true)
   }
 
@@ -143,13 +168,102 @@ function StoreProfile({ page = 'information' }) {
     navigateTo(`/store/${key}`)
   }
 
-  // There is no PUT /seller/me/store (or equivalent) yet — nothing entered on this page is
-  // persisted anywhere. The previous version showed the same "saved successfully" message
-  // regardless, which is a false claim now that real store data (below) is mixed into the
-  // same form.
-  const saveChanges = () => {
-    setDirty(false)
-    window.alert('This isn’t connected to a backend yet — nothing was actually saved.')
+  /**
+   * Save.
+   *
+   * `PATCH /seller/me/store` is a partial update: only the keys sent are written, so saving
+   * the SEO tab cannot blank out the contact tab. Each tab therefore sends its own fields
+   * rather than the whole draft.
+   *
+   * Two fields on this form are deliberately not sent, because the API refuses them:
+   *
+   *   * the storefront handle — a public URL that buyers bookmark and search engines index,
+   *     so renaming it is an admin action with a redirect, not a form field;
+   *   * legal name and business type — those were checked against documents, and letting a
+   *     seller edit them afterwards would make the verified badge meaningless.
+   *
+   * Renaming the store *is* allowed, and drops the verified badge until Mirwal has looked at
+   * the new name. The server says so in its response, and that message is surfaced rather
+   * than swallowed — losing a badge silently would read as a bug or a punishment.
+   */
+  const savePolicies = async () => {
+    setSaving(true)
+    setFlash(null)
+    try {
+      const result = await api.seller.policies.update(policyForm)
+      setDirty(false)
+      setPolicyDraft({})
+      // The server's own notice when a return window shorter than Mirwal's minimum was raised —
+      // surfaced rather than swallowed, so the seller is not surprised by what buyers see.
+      setFlash({ tone: result?.data?.notice ? 'info' : 'success', text: result?.message ?? 'Policies saved.' })
+      policiesQuery.refetch()
+    } catch (saveError) {
+      setFlash({ tone: 'error', text: describeApiError(saveError) })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const saveChanges = async (section = currentPage) => {
+    setSaving(true)
+    setFlash(null)
+    try {
+      const patch = buildPatch(section)
+      if (!Object.keys(patch).length) {
+        setFlash({ tone: 'info', text: 'Nothing has changed.' })
+        return
+      }
+      const result = await api.seller.updateStore(patch)
+      setDirty(false)
+      setFlash({ tone: 'success', text: result?.message ?? 'Store updated.' })
+      refetchStore()
+    } catch (saveError) {
+      setFlash({ tone: 'error', text: describeApiError(saveError) })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  /** Only the fields belonging to the tab being saved, and only those the API accepts. */
+  const buildPatch = (section) => {
+    const patch = {}
+    const put = (key, value) => { if (value !== undefined) patch[key] = value }
+
+    if (section === 'seo') {
+      put('metaTitle', seo.metaTitle)
+      put('metaDescription', seo.metaDescription)
+      return patch
+    }
+    if (section === 'branding') {
+      put('logoUrl', draft.logoUrl)
+      put('bannerUrl', draft.bannerUrl)
+      return patch
+    }
+    if (section === 'contact') {
+      put('supportEmail', draft.supportEmail)
+      put('supportPhone', draft.supportPhone)
+      put('addressLine1', draft.addressLine1)
+      put('addressLine2', draft.addressLine2)
+      put('city', draft.city)
+      put('province', draft.province)
+      put('postalCode', draft.postalCode)
+      return patch
+    }
+    if (section === 'hours') {
+      // Only sent when the seller actually edited them, so opening the tab and saving does
+      // not overwrite stored hours with the form's defaults.
+      if (draft.hoursTouched) {
+        patch.businessHours = Object.fromEntries(
+          hours.map((entry) => [entry.day, entry.open ? `${entry.start} - ${entry.end}` : 'Closed']),
+        )
+      }
+      return patch
+    }
+    // information / business / preview all edit the store's own description fields.
+    put('name', draft.storeName)
+    put('description', draft.shortDescription)
+    put('about', draft.about)
+    return patch
   }
 
   const renderContent = () => {
@@ -328,67 +442,179 @@ function StoreProfile({ page = 'information' }) {
           </div>
         )
 
-      case 'policies':
+      case 'hours':
+        /*
+          The tab existed in the nav with no screen behind it, so `updateHours` was orphaned
+          and `businessHours` — a column added for exactly this — was never written.
+
+          Stored as a weekday-keyed map of free text ("09:00 - 18:00", "Closed"). Free text
+          because these are read by a person deciding whether to message the seller, never
+          computed against: a marketplace does not close at 6pm, and pretending the field is
+          structured would invite code that treats it as if it were.
+        */
         return (
           <div className="store-profile-grid">
             <section className="store-profile-panel full-width-panel">
               <div className="panel-header">
-                <h2>Store Policies</h2>
+                <h2>Store hours</h2>
+                <p className="panel-note">Shown on your store page so buyers know when to expect a reply. Orders arrive at any hour.</p>
               </div>
-              <div className="policy-list">
-                {policies.map((policy) => (
-                  <div key={policy.key} className="policy-item">
-                    <div className="policy-item-header">
-                      <div>
-                        <strong>{policy.label}</strong>
-                        <small>Last updated: {policy.updated}</small>
+              <div className="hours-list">
+                {hours.map((entry) => (
+                  <div className="hours-row" key={entry.day}>
+                    <label className="hours-day">
+                      <input
+                        type="checkbox"
+                        checked={entry.open}
+                        onChange={(event) => updateHours(entry.day, 'open', event.target.checked)}
+                      />
+                      <span>{entry.day}</span>
+                    </label>
+                    {entry.open ? (
+                      <div className="hours-times">
+                        <input type="time" value={entry.start} onChange={(event) => updateHours(entry.day, 'start', event.target.value)} />
+                        <span>to</span>
+                        <input type="time" value={entry.end} onChange={(event) => updateHours(entry.day, 'end', event.target.value)} />
                       </div>
-                      <label className="switch">
-                        <input type="checkbox" checked={policy.enabled} onChange={(event) => updatePolicy(policy.key, 'enabled', event.target.checked)} />
-                        <span className="slider" />
-                      </label>
-                    </div>
-                    <textarea value={policy.content} onChange={(event) => updatePolicy(policy.key, 'content', event.target.value)} rows="4" />
-                    <div className="policy-preview-box">
-                      <span>Customer preview</span>
-                      <p>{policy.content}</p>
-                    </div>
+                    ) : <span className="hours-closed">Closed</span>}
                   </div>
                 ))}
               </div>
-              <div className="action-row">
-                <button type="button" className="btn-primary" onClick={() => saveChanges()}>Save Policies</button>
+              <div className="panel-actions">
+                <button type="button" className="btn-primary" onClick={() => saveChanges('hours')} disabled={saving}>
+                  {saving ? 'Saving…' : 'Save Hours'}
+                </button>
               </div>
             </section>
           </div>
         )
 
-      case 'hours':
+      case 'policies':
+        /*
+          These used to be six free-text blocks — return, refund, cancellation, shipping,
+          privacy, terms — none of which was stored and none of which anything acted on.
+
+          What replaced them is what `store_policies` actually models: the promises Mirwal can
+          *enforce*. A return window is checked when a buyer files a return and quoted back in a
+          dispute; a dispatch promise is measured against when the parcel was handed over. A
+          paragraph headed "Cancellation Policy" is neither.
+
+          The free text that remains explains those rules rather than substituting for them.
+        */
         return (
           <div className="store-profile-grid">
             <section className="store-profile-panel full-width-panel">
               <div className="panel-header">
-                <h2>Weekly Schedule</h2>
+                <h2>Returns &amp; delivery promises</h2>
+                <p className="panel-note">These appear on your product pages and are what buyers are held to.</p>
               </div>
-              <div className="hours-actions">
-                <button type="button" className="btn-secondary">Set all weekdays</button>
-                <button type="button" className="btn-secondary">Apply schedule</button>
-                <button type="button" className="btn-ghost">Holiday / special closure</button>
-              </div>
-              <div className="hours-table">
-                {hours.map((day) => (
-                  <div key={day.day} className="hours-row">
-                    <div className="hours-day">{day.day}</div>
-                    <label className="toggle-inline"><input type="checkbox" checked={day.open} onChange={(event) => updateHours(day.day, 'open', event.target.checked)} /><span>{day.open ? 'Open' : 'Closed'}</span></label>
-                    <label className="field-inline"><span>Opening time</span><input type="time" value={day.start} onChange={(event) => updateHours(day.day, 'start', event.target.value)} /></label>
-                    <label className="field-inline"><span>Closing time</span><input type="time" value={day.end} onChange={(event) => updateHours(day.day, 'end', event.target.value)} /></label>
-                  </div>
-                ))}
-              </div>
-              <div className="preview-card-inline">
-                <strong>Store hours</strong>
-                <p>Monday – Friday: 9:00 AM – 6:00 PM</p>
-                <p>Saturday: 10:00 AM – 5:00 PM</p>
+
+              {policiesQuery.isLoading ? <p className="panel-note">Loading…</p> : (
+                <div className="policy-fields">
+                  <label className="policy-toggle">
+                    <input
+                      type="checkbox"
+                      checked={policyForm.returnsAccepted}
+                      onChange={(event) => updatePolicy('returnsAccepted', event.target.checked)}
+                    />
+                    <span>
+                      <b>Accept returns</b>
+                      <small>Turning this off does not remove Mirwal&rsquo;s own buyer protection on faulty or wrong items.</small>
+                    </span>
+                  </label>
+
+                  <label className="policy-field">
+                    <span>Return window (days)</span>
+                    <input
+                      type="number"
+                      min={policiesQuery.data?.defaults?.returnWindowDays ?? 0}
+                      max={365}
+                      value={policyForm.returnWindowDays ?? ''}
+                      placeholder={`Mirwal default: ${policiesQuery.data?.defaults?.returnWindowDays ?? 7}`}
+                      onChange={(event) => updatePolicy('returnWindowDays', event.target.value === '' ? null : Number(event.target.value))}
+                    />
+                    <small>
+                      Leave blank to use Mirwal&rsquo;s {policiesQuery.data?.defaults?.returnWindowDays ?? 7} days. You can offer
+                      longer, not shorter.
+                    </small>
+                  </label>
+
+                  <label className="policy-field">
+                    <span>Dispatch within (days)</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={60}
+                      value={policyForm.dispatchDays ?? ''}
+                      placeholder={`Mirwal default: ${policiesQuery.data?.defaults?.dispatchDays ?? 2}`}
+                      onChange={(event) => updatePolicy('dispatchDays', event.target.value === '' ? null : Number(event.target.value))}
+                    />
+                    <small>How long you have to hand an order to a courier before it counts as late.</small>
+                  </label>
+
+                  <label className="policy-field">
+                    <span>Who pays return postage?</span>
+                    <select
+                      value={policyForm.returnShippingPaidBy}
+                      onChange={(event) => updatePolicy('returnShippingPaidBy', event.target.value)}
+                    >
+                      <option value="buyer">The buyer</option>
+                      <option value="seller">I do</option>
+                    </select>
+                    <small>When the item is faulty or wrong, you pay regardless — this covers change-of-mind returns.</small>
+                  </label>
+
+                  <label className="policy-toggle">
+                    <input
+                      type="checkbox"
+                      checked={policyForm.exchangeOffered}
+                      onChange={(event) => updatePolicy('exchangeOffered', event.target.checked)}
+                    />
+                    <span>
+                      <b>Offer exchanges</b>
+                      <small>Buyers can ask for a replacement instead of a refund.</small>
+                    </span>
+                  </label>
+
+                  <label className="policy-field wide">
+                    <span>Returns, in your own words</span>
+                    <textarea
+                      rows={3}
+                      maxLength={2000}
+                      value={policyForm.returnsText ?? ''}
+                      onChange={(event) => updatePolicy('returnsText', event.target.value)}
+                      placeholder="Anything a buyer should know before returning something."
+                    />
+                  </label>
+
+                  <label className="policy-field wide">
+                    <span>Delivery notes</span>
+                    <textarea
+                      rows={3}
+                      maxLength={2000}
+                      value={policyForm.shippingText ?? ''}
+                      onChange={(event) => updatePolicy('shippingText', event.target.value)}
+                      placeholder="Areas you deliver to, cut-off times, anything unusual."
+                    />
+                  </label>
+
+                  <label className="policy-field wide">
+                    <span>Warranty</span>
+                    <textarea
+                      rows={3}
+                      maxLength={2000}
+                      value={policyForm.warrantyText ?? ''}
+                      onChange={(event) => updatePolicy('warrantyText', event.target.value)}
+                      placeholder="What you guarantee, and for how long."
+                    />
+                  </label>
+                </div>
+              )}
+
+              <div className="panel-actions">
+                <button type="button" className="btn-primary" onClick={savePolicies} disabled={saving}>
+                  {saving ? 'Saving…' : 'Save Policies'}
+                </button>
               </div>
             </section>
           </div>
@@ -437,7 +663,7 @@ function StoreProfile({ page = 'information' }) {
                   <li>✓ Keywords are relevant to the storefront</li>
                 </ul>
               </div>
-              <button type="button" className="btn-primary" onClick={() => saveChanges()}>Save SEO</button>
+              <button type="button" className="btn-primary" onClick={() => saveChanges('seo')} disabled={saving}>{saving ? 'Saving…' : 'Save SEO'}</button>
             </section>
           </div>
         )
@@ -564,7 +790,7 @@ function StoreProfile({ page = 'information' }) {
                 </ul>
               </div>
               <div className="action-row">
-                <button type="button" className="btn-primary" onClick={() => saveChanges()}>Save Changes</button>
+                <button type="button" className="btn-primary" onClick={() => saveChanges()} disabled={saving}>{saving ? 'Saving…' : 'Save Changes'}</button>
               </div>
             </section>
           </div>
@@ -596,6 +822,9 @@ function StoreProfile({ page = 'information' }) {
           ))}
         </nav>
 
+        {/* Whatever the last save actually did — including the server's own notice when a
+            rename drops the verified badge. */}
+        {flash && <p className={`store-flash store-flash-${flash.tone}`} role="status">{flash.text}</p>}
         {renderContent()}
       </div>
     </SellerLayout>

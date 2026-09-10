@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import SellerLayout from '../SellerLayout'
-import { StatCard, DataTable, EmptyState } from '../components/SellerComponents'
+import { StatCard, DataTable, EmptyState, Pagination } from '../components/SellerComponents'
 import { useApiQuery, describeApiError } from '@mirwal/shared/useApiQuery'
 import { ErrorState, LoadingState } from '@mirwal/shared/PageStates'
 import api from '../api'
@@ -29,7 +30,25 @@ function CustomersTable({ customers }) {
 }
 
 const Customers = () => {
-  const { data, error, isLoading, refetch } = useApiQuery((signal) => api.seller.customers(signal), [])
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(25)
+
+  /**
+   * Paged and searched by the server.
+   *
+   * The summary underneath describes every customer of the store, not the page — it used to be
+   * computed by counting the fetched array, which would have silently become a description of
+   * page one the moment paging existed.
+   */
+  const { data, error, isLoading, refetch } = useApiQuery(
+    (signal) => api.seller.customers(
+      { page, pageSize: perPage, ...(search.trim() ? { search: search.trim() } : {}) },
+      signal,
+    ),
+    [page, perPage, search],
+  )
+  const refine = (apply) => { apply(); setPage(1) }
 
   return (
     <SellerLayout activeItem="customers" breadcrumbs={[{ label: 'Dashboard' }, { label: 'Customers' }]}>
@@ -53,9 +72,38 @@ const Customers = () => {
 
           <section className="finance-panel">
             <h2>All Customers</h2>
+
+            <label className="customers-search">
+              <Icon name="magnifying-glass" />
+              <input
+                value={search}
+                onChange={(event) => refine(() => setSearch(event.target.value))}
+                placeholder="Search by name or email..."
+                aria-label="Search customers"
+              />
+            </label>
+
             {data.customers.length === 0
-              ? <EmptyState icon={<Icon name="users" />} title="No customers yet" text="Once someone orders from your store, they'll show up here." />
-              : <CustomersTable customers={data.customers} />}
+              ? (
+                <EmptyState
+                  icon={<Icon name="users" />}
+                  title={search ? 'No customers match that search' : 'No customers yet'}
+                  text={search ? 'Try a different name or email.' : "Once someone orders from your store, they'll show up here."}
+                />
+              )
+              : (
+                <>
+                  <CustomersTable customers={data.customers} />
+                  <Pagination
+                    currentPage={data.pagination.page}
+                    totalPages={data.pagination.totalPages}
+                    perPage={data.pagination.pageSize}
+                    total={data.pagination.total}
+                    onPageChange={setPage}
+                    onPerPageChange={(size) => { setPerPage(size); setPage(1) }}
+                  />
+                </>
+              )}
           </section>
         </>}
       </div>

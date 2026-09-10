@@ -49,3 +49,33 @@
 .verification-footnote { margin: 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.55; }
 
 @media (max-width: 640px) { .verification-grid { grid-template-columns: 1fr; } }
+
+/* Identity details. The columns existed and nothing could write them, so a store created
+   before applications had no CNIC and a mistyped one could never be corrected. */
+.identity-card { padding:16px; margin-bottom:18px; border:1px solid var(--color-border,#e6e0dc); border-radius:8px; background:#fff; }
+.identity-head { display:flex; gap:11px; align-items:flex-start; margin-bottom:14px; }
+.identity-head span { display:grid; place-items:center; flex:0 0 32px; height:32px; border-radius:50%; color:var(--color-primary,#c2410c); background:var(--color-primary-light,#fdf1eb); }
+.identity-head h2 { margin:0; font-size:14px; }
+.identity-head p { margin:2px 0 0; color:#6b6360; font-size:10px; }
+.identity-missing { display:flex; gap:8px; padding:9px 12px; margin:0 0 12px; border-radius:6px; background:#fff6e0; color:#8a6d1f; font-size:10px; }
+.identity-locked { display:flex; gap:8px; padding:10px 12px; margin:0 0 12px; border:1px solid #cfd8ea; border-radius:6px; background:#f4f7fc; color:#3d5a80; font-size:10px; line-height:1.55; }
+.identity-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin-bottom:12px; }
+.identity-field span { display:block; margin-bottom:5px; font-size:10px; font-weight:600; }
+.identity-field input, .identity-field select { width:100%; min-height:34px; padding:0 10px; border:1px solid var(--color-border,#e6e0dc); border-radius:4px; outline:0; background:#fff; font:inherit; font-size:11px; }
+.identity-field small { display:block; margin-top:4px; color:#8a807c; font-size:9px; }
+.verification-flash.warn { background:#fff6e0; color:#8a6d1f; }
+
+/* Identity details. The columns existed and nothing could write them, so a store created
+   before applications had no CNIC on file and a mistyped one could never be corrected. */
+.identity-card { padding:16px; margin-bottom:18px; border:1px solid var(--color-border,#e6e0dc); border-radius:8px; background:#fff; }
+.identity-head { display:flex; gap:11px; align-items:flex-start; margin-bottom:14px; }
+.identity-head span { display:grid; place-items:center; flex:0 0 32px; height:32px; border-radius:50%; color:var(--color-primary,#c2410c); background:var(--color-primary-light,#fdf1eb); }
+.identity-head h2 { margin:0; font-size:14px; }
+.identity-head p { margin:2px 0 0; color:#6b6360; font-size:10px; }
+.identity-missing { display:flex; gap:8px; padding:9px 12px; margin:0 0 12px; border-radius:6px; background:#fff6e0; color:#8a6d1f; font-size:10px; }
+.identity-locked { display:flex; gap:8px; padding:10px 12px; margin:0 0 12px; border:1px solid #cfd8ea; border-radius:6px; background:#f4f7fc; color:#3d5a80; font-size:10px; line-height:1.55; }
+.identity-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin-bottom:12px; }
+.identity-field span { display:block; margin-bottom:5px; font-size:10px; font-weight:600; }
+.identity-field input, .identity-field select { width:100%; min-height:34px; padding:0 10px; border:1px solid var(--color-border,#e6e0dc); border-radius:4px; outline:0; background:#fff; font:inherit; font-size:11px; }
+.identity-field small { display:block; margin-top:4px; color:#8a807c; font-size:9px; }
+.verification-flash.warn { background:#fff6e0; color:#8a6d1f; }

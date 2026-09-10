@@ -7,6 +7,7 @@ import { navigateTo } from '@mirwal/shared/navigation'
 import Icon from '@mirwal/shared/Icon'
 import api from '../api'
 import './verification.css'
+import IdentityDetails from '../components/IdentityDetails'
 
 /**
  * Store verification — uploading identity and business documents for Mirwal to review.
@@ -126,6 +127,8 @@ export default function SellerVerification() {
           : query.isError ? <p className="verification-flash error"><Icon name="triangle-exclamation" /> {describeApiError(query.error)}</p>
             : (
               <>
+                <IdentityDetails />
+
                 <div className={`verification-banner ${data.isVerified ? 'verified' : ''}`}>
                   <Icon name={data.isVerified ? 'circle-check' : 'clock'} />
                   <div>

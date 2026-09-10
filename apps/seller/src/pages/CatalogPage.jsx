@@ -3,6 +3,7 @@ import SellerLayout from '../SellerLayout'
 import { EmptyState } from '../components/SellerComponents'
 import { useApiQuery, describeApiError } from '@mirwal/shared/useApiQuery'
 import { ErrorState, LoadingState } from '@mirwal/shared/PageStates'
+import ProtectedBrands from '../components/ProtectedBrands'
 import api from '../api'
 import { navigateTo } from '@mirwal/shared/navigation'
 import './catalog.css'
@@ -38,6 +39,9 @@ export default function CatalogPage({ type = 'categories' }) {
         <div><h1>{isBrands ? 'Brands' : 'Categories'}</h1><p>Real {isBrands ? 'brands' : 'categories'} available across the Mirwal marketplace.</p></div>
         <button type="button" disabled title="Categories and brands are managed by Mirwal, not per seller">Add New {isBrands ? 'Brand' : 'Category'}</button>
       </div>
+      {/* Which brands need permission changes what this list means, so it comes first. */}
+      {isBrands && <ProtectedBrands />}
+
       <div className="catalog-toolbar">
         <label><i className="fa-solid fa-magnifying-glass" aria-hidden="true" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={`Search ${isBrands ? 'brands' : 'categories'}...`} /></label>
       </div>

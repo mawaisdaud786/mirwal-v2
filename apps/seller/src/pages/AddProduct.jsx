@@ -5,6 +5,7 @@ import { navigateTo } from '@mirwal/shared/navigation'
 import Icon from '@mirwal/shared/Icon'
 import api from '../api'
 import './add-product.css'
+import ProductImages from '../components/ProductImages'
 
 /**
  * Create or edit a listing.
@@ -38,7 +39,7 @@ const EMPTY = {
   lowStockThreshold: '5',
   metaTitle: '',
   metaDescription: '',
-  imageUrl: '',
+  images: [],
 }
 
 /** Only send optional fields the seller actually filled in. */
@@ -56,7 +57,10 @@ function buildPayload(form, { includeStock }) {
     costPrice: optional(form.costPrice),
     metaTitle: optional(form.metaTitle),
     metaDescription: optional(form.metaDescription),
-    ...(form.imageUrl.trim() ? { images: [{ url: form.imageUrl.trim(), alt: form.name.trim() }] } : {}),
+    // Every URL here was returned by Mirwal's own upload endpoint — the form has no way to
+    // supply an arbitrary one, which is what stops a listing loading (and vouching for) an
+    // image hosted somewhere else entirely.
+    ...(form.images.length ? { images: form.images.map((image) => ({ url: image.url, alt: image.alt || form.name.trim() })) } : {}),
     // Stock and SKU belong to the default variant, which only the create path builds.
     ...(includeStock ? {
       sku: optional(form.sku),
@@ -97,7 +101,7 @@ export default function AddProduct({ editMode = false, productId }) {
       costPrice: existing.data.costPrice?.amount ?? '',
       metaTitle: existing.data.metaTitle ?? '',
       metaDescription: existing.data.metaDescription ?? '',
-      imageUrl: existing.data.images?.[0]?.url ?? '',
+      images: (existing.data.images ?? []).map((image) => ({ url: image.url, alt: image.alt ?? '' })),
     })
   }
 
@@ -270,16 +274,21 @@ export default function AddProduct({ editMode = false, productId }) {
             )}
 
             <section className="form-section">
-              <h2>Image</h2>
-              <label className="product-field">
-                <span>Image URL</span>
-                <input type="url" value={form.imageUrl} onChange={set('imageUrl')} placeholder="https://..." />
-                {/* Stated plainly: Mirwal has no file storage, so a URL is the only honest option. */}
-                <small>Mirwal has no image hosting yet, so paste a link to an image you already host. File upload will come with storage.</small>
-              </label>
-              {form.imageUrl.trim() && (
-                <img className="product-image-preview" src={form.imageUrl.trim()} alt="" loading="lazy" />
-              )}
+              <h2>Images</h2>
+              {/*
+                This was a single "paste a link to an image you already host" field, because
+                Mirwal had no image storage — which meant a seller could not put a photograph
+                on a listing, and a listing without one does not sell.
+
+                Uploads now go to Mirwal and come back as a relative path. The form never
+                accepts a URL the seller typed: an arbitrary one would make Mirwal's pages load
+                third-party content and leak every visitor's IP to whoever hosts it.
+              */}
+              <ProductImages
+                images={form.images}
+                onChange={(images) => setForm((current) => ({ ...current, images }))}
+                productName={form.name}
+              />
             </section>
 
             <section className="form-section">

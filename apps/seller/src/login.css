@@ -16,3 +16,9 @@
 .seller-login-error { margin: 0; padding: 11px 13px; border: 1px solid #ffd0cb; border-radius: var(--radius-lg); background: #fff6f5; color: var(--color-danger); font-size: 13px; }
 .seller-login-note { margin: 4px 0 0; color: var(--color-text-muted); font-size: 11.5px; text-align: center; }
 .seller-denied { text-align: center; }
+
+/* Two-factor challenge on sign-in. See the storefront note — the second step existed in the
+   API and in no login page, so turning two-factor on was a one-way door. */
+.seller-login-2fa { display:block; margin-bottom:4px; }
+.seller-login-2fa input { letter-spacing:.3em; font-size:15px; text-align:center; }
+.seller-login-2fa small { display:block; margin-top:6px; color:#6b6360; font-size:11px; line-height:1.45; }

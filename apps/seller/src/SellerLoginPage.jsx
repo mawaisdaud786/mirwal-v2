@@ -18,6 +18,15 @@ export default function SellerLoginPage() {
   const [form, setForm] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  /**
+   * The second factor.
+   *
+   * The API answers TWO_FACTOR_REQUIRED on the first attempt and only then does this form ask
+   * — sending a code speculatively would reveal which accounts are enrolled. Until this was
+   * added, no login page implemented that second step at all, so switching two-factor on in
+   * the security settings locked the account out permanently.
+   */
+  const [twoFactorRequired, setTwoFactorRequired] = useState(false)
 
   if (!isLoading && user) return <Navigate to={location.state?.from || '/'} replace />
 
@@ -27,7 +36,15 @@ export default function SellerLoginPage() {
     try {
       await login(form)
     } catch (loginError) {
-      setError(describeApiError(loginError))
+      if (loginError?.code === 'TWO_FACTOR_REQUIRED') {
+        // The password was right; the account simply has a second factor. Asking for it is not
+        // an error state, and reporting it as one makes people think their password is wrong.
+        setTwoFactorRequired(true)
+        setError('')
+      } else {
+        if (loginError?.code === 'INVALID_TWO_FACTOR') setForm((current) => ({ ...current, totpCode: '' }))
+        setError(describeApiError(loginError))
+      }
       setSubmitting(false)
     }
   }
@@ -57,9 +74,22 @@ export default function SellerLoginPage() {
           />
         </label>
 
+        {twoFactorRequired && (
+          <label className="seller-login-2fa">
+            Authentication code
+            <input
+              type="text" inputMode="numeric" autoComplete="one-time-code" required autoFocus
+              maxLength={20} placeholder="123456"
+              value={form.totpCode ?? ''}
+              onChange={(event) => setForm({ ...form, totpCode: event.target.value })}
+            />
+            <small>Six digits from your authenticator app. A recovery code works here too.</small>
+          </label>
+        )}
+
         {error && <p className="seller-login-error" role="alert">{error}</p>}
 
-        <button type="submit" disabled={submitting}>{submitting ? 'Signing in…' : 'Sign in'}</button>
+        <button type="submit" disabled={submitting}>{submitting ? 'Signing in…' : twoFactorRequired ? 'Verify and sign in' : 'Sign in'}</button>
         <p className="seller-login-note">
           New to Mirwal? Apply to become a seller on mirwal.pk.
         </p>

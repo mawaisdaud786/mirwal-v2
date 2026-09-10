@@ -32,6 +32,18 @@ export const api = {
     sessions: (signal) => request('/auth/me/sessions', { signal }),
     revokeSession: (id) => request(`/auth/me/sessions/${encodeURIComponent(id)}`, { method: 'DELETE', envelope: true }),
     twoFactor: (signal) => request('/auth/me/two-factor', { signal }),
+    /**
+     * Confirming the email and phone on the account.
+     *
+     * Shares the customer endpoints deliberately — a seller is a user with a store, and the
+     * columns being written (`users.email_verified_at`, `phone_verified_at`) are the same ones
+     * the seller-application gate checks.
+     */
+    verification: {
+      status: (signal) => request('/auth/me/verification', { signal }),
+      request: (purpose) => request('/auth/me/verification/request', { method: 'POST', body: { purpose }, envelope: true }),
+      confirm: (purpose, code) => request('/auth/me/verification/confirm', { method: 'POST', body: { purpose, code }, envelope: true }),
+    },
     beginTwoFactor: () => request('/auth/me/two-factor/setup', { method: 'POST', envelope: true }),
     confirmTwoFactor: (code) => request('/auth/me/two-factor/confirm', { method: 'POST', body: { code }, envelope: true }),
     disableTwoFactor: (password) => request('/auth/me/two-factor/disable', { method: 'POST', body: { password }, envelope: true }),
@@ -40,7 +52,64 @@ export const api = {
 
   seller: {
     store: (signal) => request('/seller/me/store', { signal }),
-    products: (signal) => request('/seller/me/products', { signal }),
+    /**
+     * Editing the store.
+     *
+     * `GET /seller/me/store` returned three fields and there was no PATCH at all, so the eight
+     * store-profile screens in this panel could display nothing and save nothing.
+     *
+     * A partial patch: only the keys sent are touched, so one section's form cannot blank out
+     * another's fields.
+     */
+    updateStore: (patch) => request('/seller/me/store', { method: 'PATCH', body: patch, envelope: true }),
+    setVacation: (body) => request('/seller/me/store/vacation', { method: 'PATCH', body, envelope: true }),
+
+    bankAccounts: {
+      list: (signal) => request('/seller/me/bank-accounts', { signal }),
+      // Adding a second account archives the first and holds payouts while Mirwal verifies it —
+      // a changed payout destination is the primary account-takeover cash-out path.
+      add: (body) => request('/seller/me/bank-accounts', { method: 'POST', body, envelope: true }),
+    },
+    /**
+     * Identity details.
+     *
+     * Distinct from the store profile: presentation is the seller's to change freely, identity
+     * is not. A blank field may be filled in; changing one that has already been verified
+     * costs the verification it was carrying, and the response says so.
+     */
+    kyc: {
+      get: (signal) => request('/seller/me/kyc', { signal }),
+      update: (body) => request('/seller/me/kyc', { method: 'PATCH', body, envelope: true }),
+    },
+
+    policies: {
+      get: (signal) => request('/seller/me/policies', { signal }),
+      update: (body) => request('/seller/me/policies', { method: 'PATCH', body, envelope: true }),
+    },
+    payoutEligibility: (signal) => request('/seller/me/payout-eligibility', { signal }),
+
+    media: {
+      list: (params, signal) => request(`/seller/me/media${buildQuery(params)}`, { signal }),
+      /**
+       * Multipart, so no JSON content-type: the browser must set its own boundary. `upload`
+       * bypasses the JSON body helper for that reason.
+       */
+      upload: (file, purpose) => {
+        const form = new FormData()
+        form.append('file', file)
+        return request(`/seller/me/media?purpose=${encodeURIComponent(purpose)}`, { method: 'POST', body: form, envelope: true })
+      },
+      remove: (id) => request(`/seller/me/media/${encodeURIComponent(id)}`, { method: 'DELETE', envelope: true }),
+    },
+    setProductImages: (productId, images) =>
+      request(`/seller/me/products/${encodeURIComponent(productId)}/images`, { method: 'PUT', body: { images }, envelope: true }),
+    /**
+     * The store's own listings, paged and filtered by the server. This used to return every
+     * listing the store had ever created, which a seller with two thousand SKUs downloaded in
+     * full to look at ten of them.
+     */
+    products: (params, signal) => request(`/seller/me/products${buildQuery(params)}`, { signal }),
+    productStatusCounts: (signal) => request('/seller/me/products/status-counts', { signal }),
 
     /**
      * Product management.
@@ -62,16 +131,65 @@ export const api = {
       update: (variantId, body) => request(`/seller/me/inventory/${encodeURIComponent(variantId)}`, { method: 'PATCH', body }),
     },
 
-    orders: (signal) => request('/seller/me/orders', { signal }),
+    /**
+     * The lines this store has to fulfil, paged and filtered by the server. It used to return
+     * every line the store had ever sold, so working today's dispatches meant downloading
+     * years of history.
+     */
+    orders: (params, signal) => request(`/seller/me/orders${buildQuery(params)}`, { signal }),
+    orderCounts: (signal) => request('/seller/me/orders/counts', { signal }),
+
+    /**
+     * Shipments.
+     *
+     * "Shipped" is no longer a status a seller can assert — the API refuses it — because it is
+     * what a shipment *means*: a carrier, a tracking number and a dispatch time. Creating one
+     * is what moves the item, so the two can never disagree.
+     */
+    carriers: (signal) => request('/seller/me/carriers', { signal }),
+    shipments: {
+      list: (params, signal) => request(`/seller/me/shipments${buildQuery(params)}`, { signal }),
+      create: (body) => request('/seller/me/shipments', { method: 'POST', body, envelope: true }),
+      update: (id, body) => request(`/seller/me/shipments/${encodeURIComponent(id)}`, { method: 'PATCH', body, envelope: true }),
+    },
     updateOrderItemStatus: (id, status) =>
       request(`/seller/me/orders/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: { status } }),
-    returns: (signal) => request('/seller/me/returns', { signal }),
-    resolveReturn: (id, payload) => request(`/seller/me/returns/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: payload }),
+    /**
+     * Returns.
+     *
+     * `advance` replaced a two-outcome approve/reject. A seller can now ask the buyer for a
+     * photograph, acknowledge that the parcel arrived, refund part of a line, or send a
+     * replacement — each of which previously had to be misrepresented as one of the two.
+     *
+     * Which moves are legal from a given state is decided server-side, so this client cannot
+     * offer one the API would refuse.
+     */
+    /**
+     * Cancelling what the store cannot supply, and answering the buyer.
+     *
+     * Neither existed. An item with no stock behind it sat in `processing` until a human
+     * noticed, and a buyer's question could only ever reach Mirwal. A reason is required on a
+     * cancellation because the buyer is shown it.
+     */
+    cancelItem: (itemId, body) =>
+      request(`/seller/me/orders/${encodeURIComponent(itemId)}/cancel`, { method: 'PATCH', body, envelope: true }),
+    orderMessages: {
+      list: (params, signal) => request(`/seller/me/order-messages${buildQuery(params)}`, { signal }),
+      unread: (signal) => request('/seller/me/order-messages/unread', { signal }),
+      thread: (orderId, signal) => request(`/seller/me/orders/${encodeURIComponent(orderId)}/messages`, { signal }),
+      send: (orderId, body) =>
+        request(`/seller/me/orders/${encodeURIComponent(orderId)}/messages`, { method: 'POST', body: { body }, envelope: true }),
+    },
+
+    returns: (params, signal) => request(`/seller/me/returns${buildQuery(params)}`, { signal }),
+    returnDetail: (id, signal) => request(`/seller/me/returns/${encodeURIComponent(id)}`, { signal }),
+    advanceReturn: (id, payload) => request(`/seller/me/returns/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: payload, envelope: true }),
+    replyToReturn: (id, body) => request(`/seller/me/returns/${encodeURIComponent(id)}/messages`, { method: 'POST', body: { body }, envelope: true }),
     refunds: (signal) => request('/seller/me/refunds', { signal }),
     settleRefund: (id) => request(`/seller/me/refunds/${encodeURIComponent(id)}/settle`, { method: 'PATCH' }),
     finance: (params, signal) => request(`/seller/me/finance${buildQuery(params)}`, { signal }),
-    customers: (signal) => request('/seller/me/customers', { signal }),
-    reviews: (signal) => request('/seller/me/reviews', { signal }),
+    customers: (params, signal) => request(`/seller/me/customers${buildQuery(params)}`, { signal }),
+    reviews: (params, signal) => request(`/seller/me/reviews${buildQuery(params)}`, { signal }),
 
     /**
      * Marketing. Scoped server-side to this store: a seller sees and edits only their own
@@ -127,6 +245,25 @@ export const api = {
       remove: (id) => request(`/seller/me/documents/${encodeURIComponent(id)}`, { method: 'DELETE', envelope: true }),
     },
 
+    /**
+     * Protected brands.
+     *
+     * Only brands Mirwal has gated appear here — most brands need nothing. A pending request
+     * does not let a seller list yet, and the page says so rather than letting them find out
+     * when the listing is refused.
+     */
+    brandAuth: {
+      list: (signal) => request('/seller/me/brand-authorizations', { signal }),
+      request: (body) => request('/seller/me/brand-authorizations', { method: 'POST', body, envelope: true }),
+    },
+
+    /** How Mirwal rates this store, and why. The risk score is never part of this response. */
+    trust: (signal) => request('/seller/me/trust', { signal }),
+    compliance: (signal) => request('/seller/me/compliance', { signal }),
+    // One appeal per action, while it is still in force. The API rejects a second.
+    appeal: (id, note) =>
+      request(`/seller/me/compliance/${encodeURIComponent(id)}/appeal`, { method: 'POST', body: { note }, envelope: true }),
+
     balance: (signal) => request('/seller/me/balance', { signal }),
     payouts: {
       list: (params, signal) => request(`/seller/me/payouts${buildQuery(params)}`, { signal }),
@@ -137,6 +274,13 @@ export const api = {
 
   notifications: {
     list: (signal) => request('/notifications', { signal }),
+    /**
+     * The same account-level preferences the storefront exposes, on the same endpoint. A
+     * seller is a user with a store, and these live on `users` — a store-scoped copy would be
+     * a second answer to one question.
+     */
+    preferences: (signal) => request('/notifications/preferences', { signal }),
+    setPreferences: (body) => request('/notifications/preferences', { method: 'PUT', body, envelope: true }),
     markRead: (id) => request(`/notifications/${encodeURIComponent(id)}/read`, { method: 'PATCH' }),
     markAllRead: () => request('/notifications/read-all', { method: 'PATCH' }),
   },

@@ -70,3 +70,62 @@
   .products-filter-row { padding: 12px; }
   .products-search { flex-basis: 100%; }
 }
+
+/* A product name that is a door, plus the delete action and its busy state.
+   `.table-link` itself now lives in seller-components.css — Vite code-splits this file's CSS
+   per route chunk, so a class used by other pages (Orders, Marketing) but only defined here
+   would silently render unstyled on any page reached without first visiting Products in the
+   same session. */
+.products-table tr.is-busy{opacity:.55}
+.table-product-actions .danger{color:var(--color-danger,#b3261e)}
+.products-flash{margin:0 0 12px;padding:9px 12px;border-radius:6px;font-size:12px}
+.products-flash.success{color:var(--color-success-dark,#1c6b3f);background:var(--color-success-light,#e6f5ec)}
+.products-flash.error{color:var(--color-danger,#b3261e);background:#fdecea}
+
+/**
+ * Below this width the table becomes cards — same technique as orders.css, for the same
+ * reason: `.products-table` needs 880px (seven columns) to lay out, which is wider than any
+ * phone. Rather than scroll a table sideways to find Price or Status, each row becomes a card
+ * and each cell prints its own label from `data-label` (set on every cell in Products.jsx).
+ */
+@media (max-width: 760px) {
+  .products-table-wrap { overflow: visible; }
+  .products-table { display: block; width: 100%; min-width: 0; }
+  .products-table thead { display: none; }
+  .products-table tbody { display: block; }
+  .products-table tr {
+    display: block;
+    margin-bottom: 12px;
+    padding: 4px 14px;
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-lg);
+    background: #fff;
+  }
+  .products-table tr:last-child { margin-bottom: 0; }
+  .products-table td {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--color-border-lightest);
+    text-align: right;
+  }
+  .products-table tr:last-child td:last-child { border-bottom: 0; }
+  .products-table td::before {
+    flex: 0 0 auto;
+    padding-top: 1px;
+    color: var(--color-text-muted);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .03em;
+    text-align: left;
+    text-transform: uppercase;
+    content: attr(data-label);
+  }
+  /* The actions column holds up to three icon buttons; stacked below their own label reads
+     better than squeezed into a narrow right-aligned column next to it. */
+  .products-table td.product-actions-cell { flex-direction: column; align-items: stretch; text-align: left; }
+  .products-table td.product-actions-cell::before { margin-bottom: 6px; }
+  .products-table .table-product-actions { justify-content: flex-start; }
+}

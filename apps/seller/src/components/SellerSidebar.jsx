@@ -75,6 +75,9 @@ const sections = [
     "SHOP MANAGEMENT",
     [
       ["store-profile", "Store Profile", "store", "/store/profile"],
+      // Sits with the store rather than with orders: it describes the store as a whole, and a
+      // seller who has just been warned looks for it here.
+      ["performance-page", "Performance", "gauge-high", "/performance"],
       [
         "shipping-settings",
         "Shipping Settings",
