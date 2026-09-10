@@ -24,7 +24,7 @@ dist-ssr
 *.sw?
 
 # Generated at build time by scripts/generate-sitemap.mjs
-public/sitemap.xml
+apps/storefront/public/sitemap.xml
 
 # Server secrets and local database config
 server/.env
