@@ -1,0 +1,72 @@
+/* ============================================================================
+   Seller Finance — withdrawals/settings extras, plus the shared stat grid
+   used by Finance AND Customers pages. Same premium spacing pass.
+   ============================================================================ */
+
+.finance-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 16px; }
+.finance-range-picker { display: flex; gap: 8px; margin-bottom: 16px; }
+.finance-range-picker button { height: 38px; padding: 0 14px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); color: var(--color-text-secondary); font-size: 13px; font-weight: 600; }
+.finance-range-picker button.active { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-lighter); }
+.finance-primary:disabled, .finance-link:disabled { opacity: .55; cursor: not-allowed; }
+
+.withdrawal-grid, .settings-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.withdrawal-form h2 { margin-bottom: 6px; }
+.withdrawal-form > p { margin: 0 0 14px; color: var(--color-text-secondary); font-size: 13px; line-height: 1.6; }
+.withdrawal-form form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.withdrawal-form label, .settings-field { display: flex; flex-direction: column; gap: 6px; color: var(--color-text-secondary); font-size: 12.5px; font-weight: 600; }
+.withdrawal-form input, .withdrawal-form select, .settings-field input, .settings-field select { height: 38px; padding: 0 12px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); color: var(--color-text); font-size: 13px; }
+.withdrawal-form .finance-primary { grid-column: span 2; }
+.finance-primary { height: 40px; padding: 0 16px; border: 0; border-radius: var(--radius-lg); background: var(--color-primary); color: #fff; font-size: 13px; font-weight: 700; }
+.finance-message { grid-column: span 2; color: var(--color-success-dark); font-size: 13px; }
+.schedule-value { margin: 20px 0 6px; font: 800 26px var(--font-heading); }
+.muted { color: var(--color-text-secondary); font-size: 13px; line-height: 1.6; }
+.finance-link { padding: 0; border: 0; background: none; color: var(--color-primary); font-size: 13px; font-weight: 600; }
+
+.settings-heading { display: flex; align-items: center; gap: 10px; }
+.settings-heading h2 { margin: 0; }
+.settings-heading p { margin: 4px 0 0; color: var(--color-text-secondary); font-size: 12.5px; }
+.settings-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--radius-lg); }
+.settings-icon.purple { color: #9149e8; background: #f3eaff; }
+.verified-badge { margin-left: auto; padding: 4px 9px; border-radius: var(--radius-pill); background: var(--color-success-light); color: var(--color-success-dark); font-size: 12px; font-weight: 700; font-style: normal; }
+.bank-details { display: grid; gap: 6px; margin: 16px 0; padding: 14px; border-radius: var(--radius-lg); background: var(--color-surface-soft); font-size: 13px; }
+.bank-details strong { font-size: 15px; }
+.bank-details span { color: var(--color-text-secondary); }
+.settings-card .finance-primary { margin-top: 14px; }
+.settings-field { margin: 12px 0; }
+.settings-row { display: flex; justify-content: space-between; align-items: center; margin: 13px 0; color: var(--color-text-secondary); font-size: 13px; }
+.settings-row b { color: var(--color-success-dark); font-size: 13px; }
+.settings-row select { height: 30px; border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: 12.5px; }
+.failed { padding: 4px 9px; border-radius: var(--radius-pill); background: #fff0f0; color: var(--color-danger); font-size: 12px; font-weight: 700; font-style: normal; }
+.finance-table-scroll { overflow: auto; }
+.finance-table-panel + .finance-table-panel { margin-top: 14px; }
+
+@media (max-width: 1000px) { .finance-stat-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 700px) {
+  .withdrawal-grid, .settings-layout { grid-template-columns: 1fr; }
+  .withdrawal-form form { grid-template-columns: 1fr; }
+  .withdrawal-form .finance-primary, .finance-message { grid-column: auto; }
+  .finance-range-picker { flex-wrap: wrap; }
+}
+@media (max-width: 600px) { .finance-stat-grid { grid-template-columns: 1fr; } }
+
+/* ---- Real withdrawals ---- */
+.payout-flash { display: flex; align-items: center; gap: 9px; margin: 0 0 14px; padding: 11px 13px; border-radius: 8px; font-size: 14px; }
+.payout-flash.success { color: var(--color-success-dark); background: var(--color-success-light); }
+.payout-flash.error { color: var(--color-danger); background: #fdecea; }
+.payout-blocked { margin-top: 10px !important; color: var(--color-danger) !important; }
+.payout-note { margin-top: 12px !important; font-size: 12px !important; line-height: 1.55; }
+.payout-table-wrap { overflow-x: auto; }
+.payout-table { width: 100%; min-width: 620px; border-collapse: collapse; font-size: 14px; }
+.payout-table th { padding: 10px 8px; background: var(--color-surface-soft); color: var(--color-text-muted); text-align: left; font-weight: 600; }
+.payout-table td { padding: 10px 8px; border-top: 1px solid var(--color-border-light); color: var(--color-text-secondary); vertical-align: top; }
+.payout-table code { padding: 2px 6px; border-radius: 4px; background: var(--color-surface-soft); font-family: var(--font-mono, monospace); font-size: 13px; }
+.payout-table small { display: block; margin-top: 3px; color: var(--color-text-muted); font-size: 12px; }
+
+/* Payout & account settings — real figures, and honest absences. */
+.settings-note { margin: 10px 0 14px; max-width: 68ch; color: var(--color-text-secondary); font-size: 13px; line-height: 1.65; }
+.settings-card .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--color-border-light, #eef0f2); font-size: 13px; }
+.settings-card .settings-row:last-of-type { border-bottom: 0; }
+.settings-card .settings-row span { color: var(--color-text-secondary); }
+.settings-card .settings-row b { color: var(--color-text); text-align: right; }
+.settings-card .finance-primary,
+.settings-card .finance-link { display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; }

@@ -1,0 +1,112 @@
+/* ============================================================================
+   Admin Customers & Reviews — real data (server/src/modules/admin), sharing
+   the generic Heading/Kpis/Filters/Table components with section="customer".
+   Same premium spacing pass as order-pages.css / products.css.
+   ============================================================================ */
+
+.customer-page { display: flex; flex-direction: column; gap: 18px; max-width: 1280px; margin: auto; }
+
+.customer-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.customer-heading h1 { margin: 0; font: 800 24px var(--font-heading); }
+.customer-heading p { display: flex; align-items: center; gap: 7px; margin: 5px 0 0; color: var(--admin-text-muted); font-size: 13px; }
+.customer-heading p i { font-size: 10px; }
+.customer-heading button { display: flex; align-items: center; gap: 7px; padding: 10px 14px; border: 1px solid var(--admin-border); border-radius: var(--radius-lg); color: var(--admin-text-secondary); background: var(--color-surface); font-size: 13px; font-weight: 600; }
+.customer-heading .primary { border-color: var(--color-primary); color: #fff; background: var(--color-primary); }
+
+.customer-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.customer-kpis article { position: relative; min-height: 92px; padding: 16px; border: 1px solid var(--admin-border); border-radius: var(--radius-2xl); background: var(--color-surface); box-shadow: var(--admin-shadow-card); }
+.customer-kpi-icon { position: absolute; top: 16px; right: 16px; display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--radius-xl); color: #6847c7; background: #f2edff; font-size: 15px; }
+.customer-kpi-icon.tone-1 { color: var(--admin-success); background: var(--admin-success-light); }
+.customer-kpi-icon.tone-2 { color: var(--admin-warning); background: var(--admin-warning-light); }
+.customer-kpi-icon.tone-3 { color: var(--admin-danger); background: var(--admin-danger-light); }
+.customer-kpi-icon.tone-4 { color: #1876c9; background: #eaf4ff; }
+.customer-kpis small { display: block; color: var(--admin-text-secondary); font-size: 13px; font-weight: 600; }
+.customer-kpis strong { display: block; margin-top: 10px; font: 800 26px var(--font-heading); }
+
+.customer-panel { padding: 18px; border: 1px solid var(--admin-border); border-radius: var(--radius-2xl); background: var(--color-surface); box-shadow: var(--admin-shadow-card); }
+
+.customer-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 16px; }
+.customer-filters label { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 220px; height: 40px; padding: 0 13px; border: 1px solid var(--admin-border); border-radius: var(--radius-pill); color: var(--admin-text-muted); background: var(--admin-surface-muted); transition: border-color var(--transition-fast); }
+.customer-filters label:focus-within { border-color: var(--color-primary); background: var(--color-surface); box-shadow: 0 0 0 3px var(--color-primary-light); }
+.customer-filters input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: var(--color-text); font-size: 13.5px; }
+.customer-filters button { display: flex; align-items: center; gap: 7px; height: 40px; padding: 0 14px; border: 1px solid var(--admin-border); border-radius: var(--radius-lg); color: var(--admin-text-secondary); background: var(--color-surface); font-size: 13px; font-weight: 600; }
+.customer-filters button:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+.customer-table-wrap { overflow: auto; border: 1px solid var(--admin-border-light); border-radius: var(--radius-xl); }
+.customer-table { width: 100%; min-width: 780px; border-collapse: collapse; color: var(--color-text); font-size: 13.5px; }
+.customer-table thead th { padding: 0 14px; height: 42px; border-bottom: 1px solid var(--admin-border); background: var(--admin-surface-muted); color: var(--admin-text-secondary); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; text-align: left; }
+.customer-table td { padding: 12px 14px; border-bottom: 1px solid var(--admin-border-light); white-space: nowrap; }
+.customer-table tbody tr:last-child td { border-bottom: 0; }
+.customer-table tbody tr:hover { background: var(--admin-surface-muted); }
+.customer-name { padding: 0; border: 0; color: var(--color-text); background: transparent; font-weight: 700; cursor: pointer; }
+.customer-name:hover { color: var(--color-primary); }
+.row-menu { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: var(--radius-md); color: var(--admin-text-muted); background: none; }
+.row-menu:hover { background: var(--admin-border-light); }
+
+.customer-status { display: inline-block; padding: 5px 10px; border-radius: var(--radius-pill); color: var(--admin-success); background: var(--admin-success-light); font-size: 12px; font-weight: 700; }
+.customer-status.inactive, .customer-status.permanently { color: var(--admin-danger); background: var(--admin-danger-light); }
+.customer-status.temporary, .customer-status.in-progress { color: #bc7600; background: var(--admin-warning-light); }
+.customer-status.open { color: var(--admin-danger); background: var(--admin-danger-light); }
+.customer-status.resolved, .customer-status.published { color: var(--admin-success); background: var(--admin-success-light); }
+
+.customer-pagination { display: flex; align-items: center; justify-content: space-between; padding-top: 14px; color: var(--admin-text-muted); font-size: 12.5px; }
+.customer-pagination div { display: flex; gap: 5px; }
+.customer-pagination button { width: 28px; height: 28px; border: 1px solid var(--admin-border); border-radius: var(--radius-md); color: var(--admin-text-secondary); background: var(--color-surface); font-size: 12.5px; }
+.customer-pagination button.active { border-color: var(--color-primary); color: #fff; background: var(--color-primary); }
+.customer-pagination select { height: 28px; padding: 0 8px; border: 1px solid var(--admin-border); border-radius: var(--radius-md); color: var(--admin-text-secondary); background: var(--color-surface); font-size: 12.5px; }
+
+@media (max-width: 650px) {
+  .customer-heading { display: block; }
+  .customer-heading button { margin-top: 10px; }
+  .customer-panel { padding: 14px; }
+}
+
+/* Review moderation.
+   The page was a read-only list: `product_reviews` had no status, so a defamatory or fake
+   review could not be taken down at all. */
+.mod-patterns { padding:12px 14px; margin-bottom:16px; border:1px solid #f5dcae; border-radius:8px; background:#fffaf0; }
+.mod-patterns h2 { display:flex; align-items:center; gap:7px; margin:0 0 8px; font-size:12px; color:#8a6d1f; }
+.mod-patterns ul { margin:0; padding-left:16px; }
+.mod-patterns li { font-size:10px; line-height:1.6; }
+.mod-patterns span { display:block; color:#6b6360; font-size:9px; }
+.mod-list { display:grid; gap:10px; margin:0; padding:0; list-style:none; }
+.mod-card { padding:14px; border:1px solid var(--color-border,#e6e0dc); border-radius:8px; background:#fff; }
+.mod-head { display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-bottom:8px; }
+.mod-stars { color:#e8a33d; font-size:12px; letter-spacing:1px; }
+.mod-head b { font-size:12px; }
+.mod-status { padding:3px 9px; border-radius:20px; font-style:normal; font-size:8px; font-weight:700; text-transform:uppercase; }
+.mod-published { color:#1c7a45; background:#e8f7ee; }
+.mod-hidden { color:#9a6b00; background:#fff6e0; }
+.mod-removed { color:#c02626; background:#fdecec; }
+.mod-reports { display:inline-flex; align-items:center; gap:4px; color:#c02626; font-size:9px; font-weight:700; }
+.mod-title { margin:0 0 4px; font-size:11px; font-weight:600; }
+.mod-body { margin:0 0 8px; color:#4a4340; font-size:11px; line-height:1.6; }
+.mod-meta { margin:0; color:#8a807c; font-size:9px; }
+.mod-previous { margin:8px 0 0; padding:7px 10px; border-radius:5px; background:var(--color-surface-muted,#f6f4f3); font-size:9px; }
+.mod-actions { display:flex; gap:8px; margin-top:11px; }
+.mod-actions button, .mod-form button { padding:7px 13px; border:1px solid var(--color-border,#e6e0dc); border-radius:5px; background:#fff; font-size:10px; cursor:pointer; }
+.mod-form { display:grid; gap:9px; margin-top:12px; padding-top:12px; border-top:1px solid var(--color-border,#e6e0dc); }
+.mod-form label span { display:block; margin-bottom:4px; font-size:10px; font-weight:600; }
+.mod-form label em { font-style:normal; font-weight:400; color:#8a807c; }
+.mod-form select, .mod-form input { width:100%; min-height:32px; padding:0 9px; border:1px solid var(--color-border,#e6e0dc); border-radius:4px; outline:0; font:inherit; font-size:10px; }
+.mod-form > div { display:flex; gap:8px; }
+
+/* One buyer: contact, trading history, orders and returns. */
+.customer-detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:16px}
+.customer-facts{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;margin:0;font-size:12px}
+.customer-facts dt{color:var(--admin-text-muted)}
+.customer-facts dd{margin:0}
+.customer-verified{margin-left:7px;color:var(--admin-success);font-size:11px}
+.customer-unverified{margin-left:7px;color:#8a6d1f;font-size:11px}
+.customer-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.customer-stats article{padding:10px 12px;border:1px solid var(--admin-border);border-radius:8px}
+.customer-stats small{display:block;color:var(--admin-text-muted);font-size:11px}
+.customer-stats strong{display:block;margin-top:3px;font-size:18px}
+.customer-stats em{display:block;margin-top:2px;color:var(--admin-text-muted);font-style:normal;font-size:11px}
+.customer-stats .tone-warn{border-color:#f0e0b8;background:#fffaf0}
+.customer-stats .tone-warn strong{color:#8a6d1f}
+.customer-table{width:100%;border-collapse:collapse;font-size:12px}
+.customer-table th,.customer-table td{padding:8px 6px;text-align:left;border-bottom:1px solid var(--admin-border)}
+.customer-empty{margin:10px 0 0;color:var(--admin-text-muted);font-size:12px}
+.customer-flash{margin:0 0 12px;padding:9px 12px;border-radius:6px;font-size:12px}
+.customer-flash.error{color:var(--admin-danger,#b3261e);background:#fdecea}

@@ -1,0 +1,46 @@
+/* Performance — the seller's own view of their trust score. */
+.perf-page { display: grid; gap: 16px; }
+.perf-head h1 { margin: 0 0 4px; font-size: 22px; }
+.perf-head p { margin: 0; font-size: 14px; color: var(--color-text-muted, #6b6259); }
+
+.perf-score { display: flex; align-items: center; gap: 20px; padding: 20px; border: 1px solid var(--color-border, #e6e0dc); border-radius: 10px; background: #fff; }
+.perf-dial { display: grid; place-content: center; justify-items: center; width: 108px; height: 108px; flex: none; border-radius: 50%; border: 6px solid var(--color-border, #e6e0dc); }
+.perf-dial strong { font-size: 30px; line-height: 1; }
+.perf-dial small { margin-top: 4px; font-size: 11px; color: var(--color-text-muted, #6b6259); }
+.perf-gold, .perf-platinum { border-color: #d9a441; }
+.perf-silver { border-color: #a9adb4; }
+.perf-bronze { border-color: #c08457; }
+.perf-score h2 { margin: 0 0 4px; font-size: 18px; }
+.perf-score p { margin: 0 0 6px; font-size: 14px; color: var(--color-text-muted, #6b6259); }
+.perf-stamp { font-size: 12px; color: var(--color-text-muted, #6b6259); }
+
+.perf-card { padding: 18px; border: 1px solid var(--color-border, #e6e0dc); border-radius: 10px; background: #fff; }
+.perf-card h2 { margin: 0 0 12px; font-size: 16px; }
+
+.perf-factors { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.perf-factors li { padding: 10px 12px; border: 1px solid var(--color-border, #e6e0dc); border-radius: 8px; }
+.perf-factors li > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.perf-factors span { font-size: 14px; }
+.perf-factors strong { font-size: 15px; }
+.perf-advice { margin: 6px 0 0; font-size: 12px; color: var(--color-text-muted, #6b6259); }
+
+.perf-clear { margin: 0; padding: 10px 12px; border-radius: 8px; font-size: 14px; color: var(--color-success-dark, #1c6b3f); background: var(--color-success-light, #e6f5ec); }
+.perf-warn { margin: 0 0 10px; padding: 10px 12px; border-radius: 8px; font-size: 14px; color: #8a6d1f; background: #fff6e0; }
+.perf-actions { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.perf-actions li { padding: 10px 12px; border: 1px solid var(--color-border, #e6e0dc); border-radius: 8px; }
+.perf-actions b { text-transform: capitalize; }
+.perf-actions p { margin: 4px 0; font-size: 13px; }
+.perf-actions small { display: block; font-size: 12px; color: var(--color-text-muted, #6b6259); }
+.perf-actions a { display: inline-block; margin-top: 6px; font-size: 13px; }
+.perf-actions button { margin-top: 8px; padding: 6px 12px; border: 1px solid var(--color-border, #e6e0dc); border-radius: 6px; background: #fff; font-size: 13px; cursor: pointer; }
+.perf-actions button:disabled { opacity: .6; cursor: default; }
+.perf-appeal { display: grid; gap: 8px; margin-top: 8px; }
+.perf-appeal textarea { padding: 8px 10px; border: 1px solid var(--color-border, #e6e0dc); border-radius: 6px; font: inherit; resize: vertical; }
+.perf-appeal > div { display: flex; gap: 8px; }
+.perf-appealed { margin-top: 6px; font-style: italic; }
+.perf-flash { margin: 8px 0 0; padding: 8px 10px; border-radius: 6px; font-size: 13px; }
+.perf-flash.success { color: var(--color-success-dark, #1c6b3f); background: var(--color-success-light, #e6f5ec); }
+.perf-flash.error { color: var(--color-danger, #b3261e); background: #fdecea; }
+.perf-history { margin-top: 14px; }
+.perf-history summary { font-size: 14px; cursor: pointer; }
+.perf-history ul { margin-top: 10px; }

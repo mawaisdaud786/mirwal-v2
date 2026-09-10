@@ -1,18 +1,30 @@
 {
-  "name": "mirwal-v2",
+  "name": "mirwal",
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "server"
+  ],
+  "engines": {
+    "node": ">=20"
   },
-  "dependencies": {
-    "bootstrap": "^5.3.8",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+  "scripts": {
+    "dev": "npm run dev --workspace @mirwal/storefront",
+    "dev:storefront": "npm run dev --workspace @mirwal/storefront",
+    "dev:admin": "npm run dev --workspace @mirwal/admin",
+    "dev:seller": "npm run dev --workspace @mirwal/seller",
+    "dev:api": "npm run dev --workspace mirwal-server",
+    "build": "npm run build:storefront && npm run build:admin && npm run build:seller",
+    "build:storefront": "npm run build --workspace @mirwal/storefront",
+    "build:admin": "npm run build --workspace @mirwal/admin",
+    "build:seller": "npm run build --workspace @mirwal/seller",
+    "lint": "eslint .",
+    "test:api": "npm test --workspace mirwal-server",
+    "optimize:images": "node scripts/optimize-images.mjs",
+    "generate:sitemap": "node scripts/generate-sitemap.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -23,6 +35,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
     "globals": "^17.7.0",
+    "sharp": "^0.35.4",
     "vite": "^8.2.0"
   }
 }

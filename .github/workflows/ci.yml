@@ -1,0 +1,114 @@
+# Mirwal CI
+#
+# Two jobs, deliberately split so the cheap one fails first: `quality` needs no
+# database and finishes in under a minute, while `api-tests` has to stand up
+# MariaDB and run the migrations before it can assert anything.
+#
+# The test suite is an integration suite, not a mocked one — it runs against a
+# real database that `db:reset` migrates and seeds. That is why this workflow
+# carries a service container rather than just calling `npm test`.
+
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      # Each app is built separately so a failure names the app that broke
+      # rather than "build failed". VITE_* values are inlined at build time, so
+      # these are only proving the build compiles — real values come from the
+      # deploy environment.
+      - name: Build storefront
+        run: npm run build:storefront
+        env:
+          VITE_API_BASE_URL: https://api.example.invalid
+          VITE_SITE_URL: https://example.invalid
+
+      - name: Build admin
+        run: npm run build:admin
+        env:
+          VITE_API_BASE_URL: https://api.example.invalid
+
+      - name: Build seller
+        run: npm run build:seller
+        env:
+          VITE_API_BASE_URL: https://api.example.invalid
+
+  api-tests:
+    name: API tests
+    runs-on: ubuntu-latest
+
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: ci-throwaway-root
+          MARIADB_DATABASE: mirwal_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+
+    env:
+      NODE_ENV: test
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ci-throwaway-root
+      DB_NAME: mirwal_ci
+      # env.js fails fast on a missing or `change-me` secret, so CI has to supply
+      # real-shaped values. These are throwaway strings for an ephemeral
+      # container and are not secrets — never reuse this pattern for a deployed
+      # environment, where they belong in the host's secret store.
+      JWT_ACCESS_SECRET: ci-only-access-e3f1a9c7b204d68a5f0c
+      JWT_REFRESH_SECRET: ci-only-refresh-7d2b8e4a1c6f930b5ae2
+      # SMTP and SMS are left unset on purpose: tests/env-guard.mjs blanks them
+      # anyway, and an unset gateway is a state the suite asserts on.
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # `migrate fresh` drops and recreates the schema, then seed populates it.
+      # Both refuse to run under NODE_ENV=production, which is why this job sets
+      # NODE_ENV=test rather than leaving it unset.
+      - name: Migrate and seed
+        run: npm run db:reset --workspace mirwal-server
+
+      - name: Confirm every migration applied
+        run: npm run migrate:status --workspace mirwal-server
+
+      - name: Run the suite
+        run: npm run test:api

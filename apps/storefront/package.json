@@ -1,0 +1,21 @@
+{
+  "name": "@mirwal/storefront",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Mirwal customer storefront (mirwal.pk). Public marketplace only \u2014 contains no admin or seller panel code.",
+  "scripts": {
+    "dev": "vite --port 5173 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5173",
+    "prebuild": "node ../../scripts/generate-sitemap.mjs"
+  },
+  "dependencies": {
+    "@mirwal/shared": "*",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.2",
+    "@stripe/react-stripe-js": "^6.8.2",
+    "@stripe/stripe-js": "^9.14.0"
+  }
+}

@@ -1,0 +1,3 @@
+/* Seller application base. Portal chrome lives in seller-layout.css. */
+:root { color-scheme: light; }
+body { margin: 0; background: var(--color-surface-soft); }

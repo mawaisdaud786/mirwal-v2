@@ -1,0 +1,74 @@
+/* ============================================================================
+   Admin operations: accounts, notifications, performance, reports, logs,
+   attributes. One stylesheet, since these views share a shell.
+   ============================================================================ */
+
+.ops-page { display: flex; flex-direction: column; gap: 16px; max-width: 1280px; margin: auto; }
+.ops-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.ops-heading h1 { margin: 0; font: 800 24px var(--font-heading); }
+.ops-heading p { display: flex; align-items: center; gap: 7px; margin: 5px 0 0; color: var(--admin-text-muted); font-size: var(--font-size-md); }
+
+.ops-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.ops-kpis article { padding: 12px; border: 1px solid var(--admin-border); border-radius: 8px; background: #fff; box-shadow: var(--admin-shadow-card); }
+.ops-kpis small { display: block; color: var(--admin-text-muted); font-size: var(--font-size-md); }
+.ops-kpis strong { display: block; margin-top: 5px; font: 800 21px var(--font-heading); }
+
+.ops-panel { padding: 14px; border: 1px solid var(--admin-border); border-radius: 8px; background: #fff; box-shadow: var(--admin-shadow-card); }
+
+.ops-flash { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; padding: 9px 12px; border-radius: 6px; font-size: var(--font-size-md); }
+.ops-flash.success { color: var(--admin-success); background: var(--admin-success-light); }
+.ops-flash.error { color: var(--admin-danger); background: var(--admin-danger-light); }
+.ops-error-note { margin: 0 0 8px; color: var(--admin-danger); font-size: var(--font-size-md); }
+
+.ops-filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.ops-filters label { display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 10px; border: 1px solid var(--admin-border); border-radius: 6px; color: var(--admin-text-muted); }
+.ops-filters input { min-width: 220px; border: 0; outline: 0; font-size: var(--font-size-md); }
+.ops-filters select { height: 32px; padding: 0 9px; border: 1px solid var(--admin-border); border-radius: 6px; background: #fff; color: var(--admin-text-secondary); font-size: var(--font-size-md); }
+
+.ops-tabs { display: flex; gap: 16px; margin-bottom: 14px; border-bottom: 1px solid var(--admin-border); overflow-x: auto; }
+.ops-tabs button { padding: 9px 0; border: 0; border-bottom: 2px solid transparent; color: var(--admin-text-muted); background: transparent; white-space: nowrap; font-size: var(--font-size-md); }
+.ops-tabs button.active { color: var(--color-primary); border-color: var(--color-primary); font-weight: 700; }
+
+.ops-table-wrap { overflow-x: auto; }
+.ops-table { width: 100%; min-width: 760px; border-collapse: collapse; font-size: var(--font-size-md); }
+.ops-table th { padding: 10px 8px; background: var(--admin-surface-muted); color: var(--admin-text-muted); text-align: left; font-weight: 600; }
+.ops-table td { padding: 10px 8px; border-top: 1px solid var(--admin-border-light); color: var(--admin-text-secondary); vertical-align: top; }
+.ops-table td strong { display: block; color: var(--admin-text-secondary); }
+.ops-table td small { display: block; margin-top: 2px; color: var(--admin-text-muted); font-size: 12px; }
+.ops-table code { padding: 2px 6px; border-radius: 4px; background: var(--admin-surface-muted); font-family: var(--font-mono, monospace); font-size: 12px; }
+.ops-table button { padding: 5px 10px; border: 1px solid var(--admin-border); border-radius: 5px; background: #fff; color: var(--admin-text-secondary); font-size: 12px; }
+.ops-table button:disabled { opacity: .5; }
+/* The one column that can be long: wrap rather than widening the table. */
+.ops-detail { max-width: 300px; white-space: normal; }
+.ops-when { white-space: nowrap; color: var(--admin-text-muted); }
+.ops-muted { color: var(--admin-text-muted); }
+.ops-danger { color: var(--admin-danger) !important; }
+.ops-actions { display: flex; gap: 6px; }
+
+.ops-status { display: inline-block; padding: 3px 8px; border-radius: var(--radius-pill); font-size: 12px; font-weight: 700; text-transform: capitalize; }
+.ops-status.active, .ops-status.dismissed { color: var(--admin-success); background: var(--admin-success-light); }
+.ops-status.pending, .ops-status.open, .ops-status.reviewing { color: #bc7600; background: var(--admin-warning-light); }
+.ops-status.suspended, .ops-status.upheld { color: var(--admin-danger); background: var(--admin-danger-light); }
+.ops-status.deleted { color: var(--admin-text-muted); background: var(--admin-surface-muted); }
+
+.ops-level { display: inline-block; padding: 3px 8px; border-radius: var(--radius-pill); font-size: 12px; font-weight: 700; text-transform: uppercase; }
+.ops-level.error { color: var(--admin-danger); background: var(--admin-danger-light); }
+.ops-level.warn { color: #bc7600; background: var(--admin-warning-light); }
+.ops-level.info { color: #6847c7; background: var(--admin-info-light); }
+
+.ops-stack { max-height: 260px; margin: 12px 0 0; padding: 12px; overflow: auto; border-radius: 8px; background: #1b2027; color: #d8e0ea; font-family: var(--font-mono, monospace); font-size: 12px; line-height: 1.55; }
+
+.ops-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; align-items: end; margin-bottom: 18px; padding: 14px; border: 1px solid var(--admin-border); border-radius: 8px; background: var(--admin-surface-muted); }
+.ops-form-wide { grid-column: span 2; }
+.ops-form label > span { display: block; margin-bottom: 5px; color: var(--admin-text-secondary); font-size: var(--font-size-md); font-weight: 600; }
+.ops-form label > small { display: block; margin-top: 4px; color: var(--admin-text-muted); font-size: 12px; }
+.ops-form input, .ops-form select { width: 100%; height: 32px; padding: 0 9px; border: 1px solid var(--admin-border); border-radius: 6px; background: #fff; color: var(--admin-text-secondary); font: var(--font-size-md) var(--font-body); }
+.ops-form-actions .primary { padding: 9px 16px; border: 1px solid var(--color-primary); border-radius: 6px; color: #fff; background: var(--color-primary); font-size: var(--font-size-md); }
+.ops-form-actions .primary:disabled { opacity: .55; }
+
+.ops-footnote { margin: 14px 0 0; color: var(--admin-text-muted); font-size: 12px; line-height: 1.55; }
+
+@media (max-width: 760px) {
+  .ops-form-wide { grid-column: span 1; }
+  .ops-filters input { min-width: 140px; }
+}

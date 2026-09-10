@@ -1,0 +1,80 @@
+/* ============================================================================
+   Seller support — real tickets answered by Mirwal staff.
+   ============================================================================ */
+
+.seller-support-page { display: flex; flex-direction: column; gap: 14px; max-width: 900px; }
+.seller-support-page h1 { margin: 0; font: 800 24px var(--font-heading); }
+.seller-support-intro { margin: 0; color: var(--color-text-secondary); font-size: 14px; }
+
+.seller-support-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.seller-support-kpis article { padding: 12px; border: 1px solid var(--color-border); border-radius: 8px; background: #fff; }
+.seller-support-kpis small { display: block; color: var(--color-text-muted); font-size: 12px; }
+.seller-support-kpis strong { display: block; margin-top: 5px; font: 800 20px var(--font-heading); }
+
+.seller-support-tabs { display: flex; align-items: center; gap: 14px; border-bottom: 1px solid var(--color-border); overflow-x: auto; }
+.seller-support-tabs button { padding: 9px 0; border: 0; border-bottom: 2px solid transparent; color: var(--color-text-secondary); background: transparent; white-space: nowrap; font-size: 14px; }
+.seller-support-tabs button.active { color: var(--color-primary); border-color: var(--color-primary); font-weight: 700; }
+.seller-support-tabs .primary { display: flex; align-items: center; gap: 6px; margin-left: auto; margin-bottom: 6px; padding: 8px 14px; border: 1px solid var(--color-primary); border-radius: 6px; color: #fff; background: var(--color-primary); }
+
+.seller-support-list { display: flex; flex-direction: column; gap: 9px; margin: 0; padding: 0; list-style: none; }
+.seller-support-list button { display: flex; flex-direction: column; gap: 4px; width: 100%; padding: 12px; border: 1px solid var(--color-border); border-radius: 8px; background: #fff; text-align: left; }
+.seller-support-list-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.seller-support-list code, .seller-support-thread code { padding: 2px 6px; border-radius: 4px; background: var(--color-surface-soft); color: var(--color-text-muted); font-family: var(--font-mono, monospace); font-size: 12px; }
+.seller-support-list strong { color: var(--color-text); font-size: 15px; }
+.seller-support-list small { color: var(--color-text-muted); font-size: 12px; text-transform: capitalize; }
+
+.seller-support-status { padding: 3px 9px; border-radius: var(--radius-pill); font-size: 12px; font-weight: 700; text-transform: capitalize; }
+.seller-support-status.open { color: #bc7600; background: #fff3d9; }
+.seller-support-status.pending { color: #6847c7; background: var(--color-info-light); }
+.seller-support-status.resolved { color: var(--color-success-dark); background: var(--color-success-light); }
+.seller-support-status.closed { color: var(--color-text-muted); background: var(--color-surface-soft); }
+
+.seller-support-form { display: flex; flex-direction: column; gap: 14px; max-width: 640px; padding: 16px; border: 1px solid var(--color-border); border-radius: 10px; background: #fff; }
+.seller-support-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.seller-support-form label > span { display: block; margin-bottom: 5px; color: var(--color-text); font-size: 14px; font-weight: 600; }
+.seller-support-form label > small { display: block; margin-top: 5px; color: var(--color-text-muted); font-size: 12px; line-height: 1.45; }
+.seller-support-form input, .seller-support-form select, .seller-support-form textarea {
+  width: 100%; padding: 9px 10px; border: 1px solid var(--color-border); border-radius: 6px;
+  background: #fff; color: var(--color-text); font: 14px var(--font-body); outline: 0;
+}
+.seller-support-form textarea { resize: vertical; }
+.seller-support-actions { display: flex; gap: 9px; }
+.seller-support-actions button { padding: 9px 16px; border: 1px solid var(--color-border); border-radius: 6px; background: #fff; color: var(--color-text-secondary); font-size: 14px; }
+.seller-support-actions .primary { border-color: var(--color-primary); color: #fff; background: var(--color-primary); }
+.seller-support-actions button:disabled { opacity: .55; }
+
+.seller-support-thread { display: flex; flex-direction: column; gap: 14px; }
+.seller-support-thread header { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
+.seller-support-thread h1 { margin: 0; font: 800 21px var(--font-heading); }
+.seller-support-thread header p { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 5px 0 0; color: var(--color-text-muted); font-size: 13px; text-transform: capitalize; }
+.seller-support-thread-actions { display: flex; align-items: center; gap: 10px; }
+.seller-support-thread-actions button { padding: 7px 13px; border: 1px solid var(--color-border); border-radius: 6px; background: #fff; color: var(--color-text-secondary); font-size: 13px; }
+
+.seller-support-messages { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.seller-support-message { padding: 12px 14px; border: 1px solid var(--color-border); border-radius: 10px; background: #fff; }
+/* Mirwal's replies sit opposite the seller's, so the thread reads as a conversation. */
+.seller-support-message.staff { margin-right: 32px; background: var(--color-surface-soft); }
+.seller-support-message.requester { margin-left: 32px; }
+.seller-support-message > span { display: flex; align-items: baseline; gap: 10px; margin-bottom: 5px; }
+.seller-support-message strong { color: var(--color-text); font-size: 13px; }
+.seller-support-message time { margin-left: auto; color: var(--color-text-muted); font-size: 12px; }
+.seller-support-message p { margin: 0; color: var(--color-text-secondary); font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
+
+.seller-support-reply { display: flex; gap: 9px; align-items: flex-end; }
+.seller-support-reply textarea { flex: 1; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px; font: 14px var(--font-body); resize: vertical; outline: 0; }
+.seller-support-reply .primary { padding: 10px 17px; border: 1px solid var(--color-primary); border-radius: 6px; color: #fff; background: var(--color-primary); font-size: 14px; white-space: nowrap; }
+.seller-support-reply .primary:disabled { opacity: .55; }
+
+.seller-support-closed { margin: 0; padding: 12px 14px; border-radius: 8px; background: var(--color-surface-soft); color: var(--color-text-secondary); font-size: 14px; }
+.seller-support-closed button { border: 0; background: none; color: var(--color-primary); font: inherit; text-decoration: underline; padding: 0; }
+
+.seller-support-flash { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 12px; border-radius: 8px; font-size: 14px; }
+.seller-support-flash.error { color: var(--color-danger); background: #fdecea; }
+.seller-support-loading { color: var(--color-text-muted); font-size: 14px; }
+
+@media (max-width: 700px) {
+  .seller-support-kpis { grid-template-columns: repeat(2, 1fr); }
+  .seller-support-form-row { grid-template-columns: 1fr; }
+  .seller-support-message.staff, .seller-support-message.requester { margin-left: 0; margin-right: 0; }
+  .seller-support-reply { flex-direction: column; align-items: stretch; }
+}

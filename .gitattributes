@@ -1,0 +1,19 @@
+# Line endings are LF in the repository and in the working tree on every
+# platform. core.autocrlf was left on locally, which meant a Windows checkout
+# rewrote every file to CRLF while Linux CI kept LF — the same commit then
+# produced different files depending on who checked it out.
+* text=auto eol=lf
+
+# Never touched: byte-for-byte as committed.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.avif binary
+*.ico  binary
+*.woff binary
+*.woff2 binary
+*.pdf  binary
+*.gz   binary
+*.zip  binary

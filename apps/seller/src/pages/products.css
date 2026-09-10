@@ -1,0 +1,131 @@
+/* ============================================================================
+   Seller Products — every row/number here is real (GET /seller/me/products);
+   this rewrite only changes presentation: bigger type, more padding, sticky
+   header, real column sort, clearer hierarchy than the previous 7-10px
+   padding / 12-14px fonts.
+   ============================================================================ */
+
+.products-container { display: flex; flex-direction: column; gap: 18px; }
+.products-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.products-header-left h1 { font-size: 22px; font-weight: 800; font-family: var(--font-heading); margin: 0 0 5px; color: var(--color-text); }
+.products-header-left p { font-size: 13px; color: var(--color-text-secondary); margin: 0; }
+.products-header-actions { display: flex; align-items: center; gap: 9px; }
+
+.btn-add-product { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; background: var(--color-primary); color: #fff; border: 0; border-radius: var(--radius-lg); font-size: 13.5px; font-weight: 700; transition: background var(--transition-fast), transform var(--transition-fast); }
+.btn-add-product:hover { background: var(--color-primary-dark); transform: translateY(-1px); }
+
+.products-summary { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.products-summary article { min-height: 90px; padding: 15px; border: 1px solid var(--color-border-light); border-radius: var(--radius-xl); background: var(--color-surface); box-shadow: var(--shadow-xs); }
+.products-summary span { display: block; color: var(--color-text-secondary); font-size: 12.5px; font-weight: 600; }
+.products-summary strong { display: block; margin-top: 9px; font: 800 24px var(--font-heading); }
+
+.products-workspace { border: 1px solid var(--color-border-light); border-radius: var(--radius-xl); background: var(--color-surface); overflow: hidden; }
+.products-filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 16px; border-bottom: 1px solid var(--color-border-light); }
+.products-search { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 200px; height: 40px; padding: 0 13px; border: 1px solid var(--color-border); border-radius: var(--radius-pill); color: var(--color-text-muted); background: var(--color-surface-soft); transition: border-color var(--transition-fast); }
+.products-search:focus-within { border-color: var(--color-primary); background: var(--color-surface); box-shadow: 0 0 0 3px var(--color-primary-light); }
+.products-search input { width: 100%; border: 0; outline: 0; font-size: 13.5px; font-family: var(--font-body); color: var(--color-text); background: transparent; }
+.products-filter-row select { min-width: 0; height: 40px; padding: 0 12px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); color: var(--color-text); font-size: 13px; font-family: var(--font-body); }
+.products-reset { display: flex; align-items: center; gap: 7px; height: 40px; padding: 0 14px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); color: var(--color-text-secondary); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.products-reset:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+.product-tabs { display: flex; gap: 22px; padding: 0 16px; border-bottom: 1px solid var(--color-border-light); overflow-x: auto; }
+.product-tabs button { position: relative; flex: 0 0 auto; padding: 13px 2px 11px; border: 0; background: none; color: var(--color-text-secondary); font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+.product-tabs button.active { color: var(--color-primary); }
+.product-tabs button.active::after { position: absolute; right: 0; bottom: -1px; left: 0; height: 2px; background: var(--color-primary); content: ''; }
+
+.products-table-wrap { overflow-x: auto; }
+.products-table { width: 100%; border-collapse: collapse; min-width: 880px; }
+.products-table thead th { position: sticky; top: 0; z-index: 1; padding: 0; border-bottom: 1px solid var(--color-border); background: var(--color-surface-soft); text-align: left; }
+.sort-header { display: flex; align-items: center; gap: 6px; width: 100%; height: 42px; padding: 0 14px; border: 0; background: none; color: var(--color-text-secondary); font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; text-align: left; }
+.sort-header:hover { color: var(--color-text); }
+.sort-header.active { color: var(--color-primary); }
+.sort-header i { font-size: 10px; }
+.sort-header i.is-idle { opacity: .3; }
+.plain-th { padding: 0 14px; height: 42px; color: var(--color-text-secondary); font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+.products-table td { padding: 12px 14px; border-bottom: 1px solid var(--color-border-lightest); color: var(--color-text); font-size: 13.5px; }
+.products-table tbody tr:last-child td { border-bottom: 0; }
+.products-table tbody tr:hover { background: var(--color-surface-soft); }
+
+.product-category, .product-status { display: inline-block; padding: 4px 9px; border-radius: var(--radius-pill); background: var(--color-info-light); color: var(--color-info); font-size: 12px; font-style: normal; white-space: nowrap; font-weight: 600; }
+.product-status.active { background: var(--color-success-light); color: var(--color-success-dark); }
+.product-status.draft { background: var(--color-border-light); color: var(--color-text-secondary); }
+.stock-in { display: block; margin-top: 2px; color: var(--color-success-dark); font-size: 11.5px; font-weight: 600; }
+.stock-low { display: block; margin-top: 2px; color: var(--color-primary); font-size: 11.5px; font-weight: 600; }
+.stock-out { display: block; margin-top: 2px; color: var(--color-danger); font-size: 11.5px; font-weight: 600; }
+.table-product-actions { display: flex; gap: 6px; }
+.table-product-actions button { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text-secondary); font-size: 13px; transition: border-color var(--transition-fast), color var(--transition-fast); }
+.table-product-actions button:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+.products-pagination { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; color: var(--color-text-secondary); font-size: 12.5px; }
+
+@media (max-width: 900px) {
+  .products-summary { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 800px) {
+  .products-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+}
+@media (max-width: 600px) {
+  .products-header { align-items: center; flex-direction: row; gap: 10px; }
+  .products-summary { grid-template-columns: repeat(2, 1fr); }
+  .products-filter-row { padding: 12px; }
+  .products-search { flex-basis: 100%; }
+}
+
+/* A product name that is a door, plus the delete action and its busy state.
+   `.table-link` itself now lives in seller-components.css — Vite code-splits this file's CSS
+   per route chunk, so a class used by other pages (Orders, Marketing) but only defined here
+   would silently render unstyled on any page reached without first visiting Products in the
+   same session. */
+.products-table tr.is-busy{opacity:.55}
+.table-product-actions .danger{color:var(--color-danger,#b3261e)}
+.products-flash{margin:0 0 12px;padding:9px 12px;border-radius:6px;font-size:12px}
+.products-flash.success{color:var(--color-success-dark,#1c6b3f);background:var(--color-success-light,#e6f5ec)}
+.products-flash.error{color:var(--color-danger,#b3261e);background:#fdecea}
+
+/**
+ * Below this width the table becomes cards — same technique as orders.css, for the same
+ * reason: `.products-table` needs 880px (seven columns) to lay out, which is wider than any
+ * phone. Rather than scroll a table sideways to find Price or Status, each row becomes a card
+ * and each cell prints its own label from `data-label` (set on every cell in Products.jsx).
+ */
+@media (max-width: 760px) {
+  .products-table-wrap { overflow: visible; }
+  .products-table { display: block; width: 100%; min-width: 0; }
+  .products-table thead { display: none; }
+  .products-table tbody { display: block; }
+  .products-table tr {
+    display: block;
+    margin-bottom: 12px;
+    padding: 4px 14px;
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-lg);
+    background: #fff;
+  }
+  .products-table tr:last-child { margin-bottom: 0; }
+  .products-table td {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--color-border-lightest);
+    text-align: right;
+  }
+  .products-table tr:last-child td:last-child { border-bottom: 0; }
+  .products-table td::before {
+    flex: 0 0 auto;
+    padding-top: 1px;
+    color: var(--color-text-muted);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .03em;
+    text-align: left;
+    text-transform: uppercase;
+    content: attr(data-label);
+  }
+  /* The actions column holds up to three icon buttons; stacked below their own label reads
+     better than squeezed into a narrow right-aligned column next to it. */
+  .products-table td.product-actions-cell { flex-direction: column; align-items: stretch; text-align: left; }
+  .products-table td.product-actions-cell::before { margin-bottom: 6px; }
+  .products-table .table-product-actions { justify-content: flex-start; }
+}

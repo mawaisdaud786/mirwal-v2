@@ -1,0 +1,18 @@
+{
+  "name": "@mirwal/admin",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Mirwal admin application (admin.mirwal.pk). Administrative functionality only \u2014 never bundled into the storefront.",
+  "scripts": {
+    "dev": "vite --port 5174 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5174"
+  },
+  "dependencies": {
+    "@mirwal/shared": "*",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.2"
+  }
+}

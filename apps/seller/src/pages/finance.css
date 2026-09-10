@@ -1,0 +1,47 @@
+/* ============================================================================
+   Seller Finance overview — real data (GET /seller/me/finance). Only
+   .finance-container/-header/-panel are actually used here; the stat grid,
+   range picker and settings styles live in finance-extra.css. The shared
+   StatCard/DataTable components (seller-components.css) were already
+   well-spaced and are untouched.
+   ============================================================================ */
+
+.finance-container { display: flex; flex-direction: column; gap: 18px; color: var(--color-text); }
+.finance-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.finance-header h1 { margin: 0; font: 800 22px var(--font-heading); }
+.finance-header p { margin: 5px 0 0; color: var(--color-text-secondary); font-size: 13px; }
+.finance-header > div:last-child { display: flex; gap: 8px; }
+
+.finance-panel { padding: 18px; border: 1px solid var(--color-border-light); border-radius: var(--radius-xl); background: var(--color-surface); box-shadow: var(--shadow-xs); }
+.finance-panel h2 { margin: 0 0 14px; font: 800 15px var(--font-heading); }
+
+@media (max-width: 600px) {
+  .finance-header { gap: 12px; flex-direction: column; }
+  .finance-header > div:last-child { flex-wrap: wrap; }
+  .finance-panel { padding: 14px; }
+}
+
+/* Payout account. Replaces the note claiming Mirwal stored no bank details — it does now,
+   masked and verified, and the change flow holds withdrawals while that happens. */
+.payout-account { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 13px; margin-bottom:10px; border:1px solid var(--color-border,#e6e0dc); border-radius:6px; background:#fff; }
+.payout-account b { display:block; font-size:12px; }
+.payout-account small { display:block; margin-top:3px; color:#6b6360; font-size:10px; }
+.payout-status { display:inline-flex; align-items:center; gap:5px; flex-shrink:0; padding:4px 9px; border-radius:20px; font-style:normal; font-size:9px; font-weight:700; }
+.payout-verified { color:#1c7a45; background:#e8f7ee; }
+.payout-pending { color:#9a6b00; background:#fff6e0; }
+.payout-rejected { color:#c02626; background:#fdecec; }
+.payout-reason { color:#c02626!important; }
+.payout-form { display:grid; gap:11px; margin-top:12px; }
+.payout-form label span { display:block; margin-bottom:5px; font-size:10px; font-weight:600; }
+.payout-form input, .payout-form select { width:100%; min-height:34px; padding:0 10px; border:1px solid var(--color-border,#e6e0dc); border-radius:4px; outline:0; background:#fff; font:inherit; font-size:11px; }
+.payout-form small { display:block; margin-top:4px; color:#8a807c; font-size:9px; }
+.payout-actions { display:flex; gap:9px; align-items:center; }
+.payout-warning { display:flex; gap:8px; padding:10px 12px; border:1px solid #f5dcae; border-radius:6px; background:#fffaf0; color:#8a6d1f; font-size:10px; line-height:1.5; }
+.payout-blocked { display:flex; gap:8px; margin-top:12px; padding:10px 12px; border-radius:6px; background:#f6f4f3; color:#6b6360; font-size:10px; line-height:1.5; }
+.payout-flash { margin:0 0 11px; padding:9px 12px; border-radius:5px; font-size:10px; line-height:1.5; }
+.payout-flash-success { color:#1c7a45; background:#e8f7ee; }
+.payout-flash-error { color:#c02626; background:#fdecec; }
+
+/* Search on the customers list, now that the list is paged and the browser cannot filter it. */
+.customers-search{display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:7px 11px;border:1px solid var(--color-border,#e6e0dc);border-radius:6px;background:#fff;max-width:360px}
+.customers-search input{flex:1;border:0;background:none;font:inherit;font-size:12px;outline:none}

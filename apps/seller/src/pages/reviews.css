@@ -1,0 +1,46 @@
+.reviews-container{display:flex;flex-direction:column;gap:14px;color:var(--color-text)}
+.reviews-header{display:flex;justify-content:space-between;align-items:flex-start}.reviews-header h1{margin:0;font:800 18px var(--font-heading)}.reviews-header p{margin:3px 0 0;color:var(--color-text-secondary);font-size:var(--font-size-2xl)}.reviews-export{height:30px;padding:0 12px;border:1px solid var(--color-border-light);border-radius:5px;background:#fff;font-size:var(--font-size-2xl)}.reviews-export i{margin-right:6px}
+/**
+ * The stat row: three real cards (Average Rating, Total Reviews, Needs Attention).
+ *
+ * This used to define a 5-column grid — sized for a row that also carried a rating-distribution
+ * bar chart and a "positive" trend figure, both fabricated (no per-star breakdown or sentiment
+ * data has ever existed here). Once those were removed the three real cards were left occupying
+ * only the first three of five flexible tracks; `fr` tracks reserve their share of the row's
+ * width whether or not anything sits in them, so the cards sat squeezed into ~56% of the row
+ * with the remaining ~44% empty space to the right. Three tracks for three cards.
+ */
+.review-stats { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; }
+.review-stats article { position:relative; min-height:79px; padding:12px 44px 12px 12px; border:1px solid var(--color-border-light); border-radius:var(--radius-5xl); background:#fff; box-shadow:0 4px 14px rgba(20,60,95,.05); transition:box-shadow .18s ease, transform .18s ease; }
+.review-stats article:hover { box-shadow:0 9px 22px rgba(20,60,95,.09); transform:translateY(-2px); }
+.review-stats article>span:not(.review-stat-icon),.review-stats article>small { display:block; }
+.review-stats article>span:not(.review-stat-icon) { font-size:var(--font-size-xl); color:var(--color-text-secondary); }
+.review-stats article>strong { display:block; margin-top:8px; font:800 24px var(--font-heading); }
+.review-stats article>small { margin-top:7px; color:var(--color-text-secondary); font-size:var(--font-size-xl); }
+.review-stat-icon { position:absolute; top:12px; right:12px; display:grid; place-items:center; width:30px; height:30px; border-radius:10px; font-size:13px; }
+.review-stat-icon.orange { color:#e05a1f; background:#ffe4d3; }
+.review-stat-icon.blue { color:#4b7ff2; background:#edf3ff; }
+.review-stat-icon.red { color:#ef4c4c; background:#fff0f0; }
+
+@media (max-width:640px){ .review-stats { grid-template-columns:1fr; } }
+
+/* Real review list (GET /seller/me/reviews). */
+.review-list { display:grid; gap:10px; }
+.review-row { padding:14px; border:1px solid var(--color-border-light); border-radius:var(--radius-xl); background:#fff; box-shadow:var(--shadow-xs); }
+.review-row header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.review-row header > div { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.review-row header small { color:var(--color-text-secondary); font-size:12px; white-space:nowrap; }
+.review-stars { display:inline-flex; gap:2px; color:var(--color-accent); font-size:12px; white-space:nowrap; }
+.review-stars .is-empty { color:var(--color-border); }
+.review-product { padding:0; border:0; background:none; color:var(--color-primary); font-size:12.5px; font-weight:700; }
+.review-product:hover { text-decoration:underline; }
+.review-row h3 { margin:9px 0 0; font:700 13px var(--font-heading); }
+.review-row p { margin:7px 0 0; color:var(--color-text-secondary); font-size:13px; line-height:1.6; }
+.review-row footer { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-top:11px; padding-top:10px; border-top:1px solid var(--color-border-lightest); font-size:12px; }
+.review-author { font-weight:700; }
+.review-verified { display:inline-flex; align-items:center; gap:5px; color:var(--color-success-dark); }
+
+/* All / needs-attention, the only split a seller answering complaints actually needs. */
+.review-filters{display:flex;gap:8px;margin-bottom:14px}
+.review-filters button{padding:6px 13px;border:1px solid var(--color-border,#e6e0dc);border-radius:999px;background:#fff;font:inherit;font-size:12px;cursor:pointer}
+.review-filters button.active{border-color:var(--color-primary,#e8683c);background:var(--color-primary,#e8683c);color:#fff}
