@@ -49,6 +49,13 @@ const DEFAULTS = [
   ['orders.return_window_days', 'number', 7, 'Return window (days after delivery)', 'How long a buyer has to file a return once an item is delivered.'],
   ['orders.dispatch_sla_hours', 'number', 48, 'Dispatch promise (hours)', 'How long a seller has to hand an order to a courier before it counts as late.'],
   ['tax.prices_include_tax', 'boolean', true, 'Displayed prices include tax', 'When on, the listed price is tax-inclusive and tax is shown as a breakdown rather than added at checkout.'],
+  // Printed at the top of every tax invoice. Blank is allowed — a marketplace that is not yet
+  // sales-tax registered still issues invoices, it simply has no STRN to quote.
+  ['company.legal_name', 'string', 'Mirwal', 'Registered business name', 'The name Mirwal invoices under.'],
+  ['company.ntn', 'string', '', 'NTN', 'Mirwal’s tax number, shown on invoices.'],
+  ['company.strn', 'string', '', 'Sales tax number (STRN)', 'Shown on invoices when Mirwal is registered for sales tax.'],
+  ['company.address', 'string', '', 'Registered address', 'The address printed on invoices.'],
+  ['tax.invoice_prefix', 'string', 'MIR', 'Invoice number prefix', 'Invoices are numbered <prefix>-<year>-<sequence>, gapless within a year.'],
 ]
 
 /** Wrapped as {"v": …} so json_valid() accepts scalars on every MariaDB build. */

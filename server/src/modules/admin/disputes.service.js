@@ -1,6 +1,9 @@
 import { query } from '../../db/pool.js'
 import { formatMoney } from '../../lib/money.js'
 
+/** Still someone's problem. Mirrors `uq_return_requests_open` in migration 021. */
+const OPEN = new Set(['requested', 'more_info_required', 'approved', 'in_transit', 'received', 'escalated'])
+
 /**
  * Platform-wide, read-only view of return requests and the refunds they caused.
  *
@@ -8,9 +11,12 @@ import { formatMoney } from '../../lib/money.js'
  * still no disputes, refunds or returns system" — true when written, stale now that
  * `return_requests` (migration 005) and `refunds` (migration 008) are real tables with real
  * seller-scoped and buyer-scoped views already built on top of them. This is the same data,
- * read across every seller instead of filtered to one — an admin oversight page, not a new
- * moderation workflow: there is no admin action here (approve/reject already belongs to the
- * seller the request was filed against), only visibility.
+ * read across every seller instead of filtered to one.
+ *
+ * It stays read-only. Deciding a return the buyer has escalated is a different thing with its
+ * own permission and its own queue — see `returns.service.js` and `/admin/returns/disputes` —
+ * because it moves money against a seller's stated decision, which is not the same authority
+ * as being able to look at one.
  */
 export async function listDisputes() {
   const rows = await query(
@@ -49,9 +55,18 @@ export async function listDisputes() {
     disputes,
     summary: {
       total: disputes.length,
-      pending: disputes.filter((d) => d.status === 'requested').length,
-      approved: disputes.filter((d) => d.status === 'approved').length,
+      // Buckets over the whole lifecycle, not the three states this originally knew about.
+      // While it counted only requested/approved/rejected, every return that was awaiting a
+      // photograph, in transit, received, replaced, withdrawn or escalated fell through all
+      // three counters and the summary silently disagreed with the list beside it.
+      open: disputes.filter((d) => OPEN.has(d.status)).length,
+      awaitingSeller: disputes.filter((d) => d.status === 'requested').length,
+      awaitingBuyer: disputes.filter((d) => d.status === 'more_info_required').length,
+      inTransit: disputes.filter((d) => d.status === 'in_transit' || d.status === 'received').length,
+      escalated: disputes.filter((d) => d.status === 'escalated').length,
+      settled: disputes.filter((d) => d.status === 'refunded' || d.status === 'replaced').length,
       rejected: disputes.filter((d) => d.status === 'rejected').length,
+      cancelled: disputes.filter((d) => d.status === 'cancelled').length,
       // A refund a seller still owes the buyer out-of-band (COD/wallet) — the one figure an
       // admin genuinely needs to keep an eye on, since Mirwal cannot force it to happen.
       refundsOwed: disputes.filter((d) => d.refund?.status === 'manual_required').length,

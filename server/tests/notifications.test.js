@@ -1,6 +1,6 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { startTestServer, apiFetch, registerTestUser, loginAs } from './setup.js'
+import { startTestServer, apiFetch, registerTestUser, loginAs, shipItem } from './setup.js'
 import { queryOne, closePool } from '../src/db/pool.js'
 
 /**
@@ -112,6 +112,8 @@ test('a real return request and its resolution both notify the right party', asy
   const orderItemId = order.items[0].id
 
   for (const status of ['confirmed', 'processing', 'shipped', 'delivered']) {
+    // See setup.js: 'shipped' is what a shipment means, so it is created rather than asserted.
+    if (status === 'shipped') { await shipItem(server.baseUrl, sellerAToken, orderItemId, apiFetch); continue }
     const result = await apiFetch(server.baseUrl, `/seller/me/orders/${orderItemId}/status`, {
       method: 'PATCH', token: sellerAToken, body: { status },
     })
@@ -119,7 +121,7 @@ test('a real return request and its resolution both notify the right party', asy
   }
 
   const returnRequest = await apiFetch(server.baseUrl, `/orders/items/${orderItemId}/return-request`, {
-    method: 'POST', token: buyer.accessToken, body: { reason: 'Wrong item received' },
+    method: 'POST', token: buyer.accessToken, body: { reason: 'wrong_item', description: 'Wrong item received.' },
   })
   assert.equal(returnRequest.status, 201)
 
@@ -127,15 +129,30 @@ test('a real return request and its resolution both notify the right party', asy
   const returnRequestedNotif = sellerNotifs.body.data.find((n) => n.type === 'return_requested' && n.title.includes(order.orderNumber))
   assert.ok(returnRequestedNotif, 'seller should have a return_requested notification')
 
-  const returnRequestId = returnRequest.body.data.returnRequest.id
+  // The notification is now per outcome rather than one generic `return_resolved`, because
+  // "approved" and "declined" are the two things a buyer most needs to be able to tell apart
+  // from the notification alone.
+  const returnRequestId = returnRequest.body.data.id
   const resolved = await apiFetch(server.baseUrl, `/seller/me/returns/${returnRequestId}/status`, {
-    method: 'PATCH', token: sellerAToken, body: { status: 'approved', resolutionNote: 'Refunded in cash.' },
+    method: 'PATCH', token: sellerAToken, body: { status: 'approved', note: 'Send it back and we will refund.' },
   })
-  assert.equal(resolved.status, 200)
+  assert.equal(resolved.status, 200, JSON.stringify(resolved.body))
 
   const buyerNotifs = await apiFetch(server.baseUrl, '/notifications', { token: buyer.accessToken })
-  const resolvedNotif = buyerNotifs.body.data.find((n) => n.type === 'return_resolved' && n.title.includes(order.orderNumber))
-  assert.ok(resolvedNotif, 'buyer should have a return_resolved notification')
-  assert.ok(resolvedNotif.body.includes('Refunded in cash.'))
-  // No cleanup needed: approving the return already restocked the inventory this test used.
+  const resolvedNotif = buyerNotifs.body.data.find((n) => n.type === 'return_approved')
+  assert.ok(resolvedNotif, 'buyer should be told their return was approved')
+  // The seller's own words reach the buyer. A seller who writes an explanation nobody sees
+  // stops writing them.
+  assert.ok(resolvedNotif.body.includes('Send it back and we will refund.'))
+
+  // Approval no longer restocks — an approved return whose parcel never arrives must not have
+  // put the item back on sale — so settling it is both the cleanup and the assertion that the
+  // rest of the lifecycle works.
+  const settled = await apiFetch(server.baseUrl, `/seller/me/returns/${returnRequestId}/status`, {
+    method: 'PATCH', token: sellerAToken, body: { status: 'refunded' },
+  })
+  assert.equal(settled.status, 200, JSON.stringify(settled.body))
+
+  const afterRefund = await apiFetch(server.baseUrl, '/notifications', { token: buyer.accessToken })
+  assert.ok(afterRefund.body.data.some((n) => n.type === 'return_refunded'))
 })

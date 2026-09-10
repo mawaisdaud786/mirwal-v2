@@ -65,5 +65,6 @@ test('the seeded admin account can reach the admin-only endpoint', async () => {
   const token = await loginAs(server.baseUrl, 'admin@mirwal.test', 'MirwalDev123!')
   const { status, body } = await apiFetch(server.baseUrl, '/admin/orders', { token })
   assert.equal(status, 200)
-  assert.ok(Array.isArray(body.data))
+  // A page envelope now that the endpoint pages server-side, not a bare array.
+  assert.ok(Array.isArray(body.data.items))
 })

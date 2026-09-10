@@ -196,7 +196,7 @@ export async function approveSeller(publicId, adminUserId) {
 
   // Tell them. An approval the applicant never hears about leaves them waiting on a decision
   // that has already been made. send() never throws, so mail trouble cannot undo the approval.
-  await messaging.send('seller.approved', {
+  messaging.sendInBackground('seller.approved', {
     to: seller.owner_email,
     userId: seller.user_id,
     variables: { sellerName: seller.owner_name, storeName: seller.store_name },
@@ -222,7 +222,7 @@ export async function rejectSeller(publicId, reason) {
     [reason, seller.id],
   )
 
-  await messaging.send('seller.rejected', {
+  messaging.sendInBackground('seller.rejected', {
     to: seller.owner_email,
     userId: seller.user_id,
     variables: { sellerName: seller.owner_name, storeName: seller.store_name, reason },

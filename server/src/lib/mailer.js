@@ -30,8 +30,52 @@ function getTransport() {
     port: env.mail.port,
     secure: env.mail.secure,
     ...(env.mail.user ? { auth: { user: env.mail.user, pass: env.mail.password } } : {}),
+
+    /**
+     * Keep connections open between messages.
+     *
+     * Caching the transport object was not enough: without `pool`, every `sendMail` opened a
+     * fresh TCP connection and redid the TLS handshake and AUTH, which measured a steady
+     * ~3 seconds per message against Gmail and never improved. Because verification and
+     * password-reset both await the send in order to report honestly whether it went, that
+     * 3 seconds was the user staring at a spinner.
+     *
+     * Pooled, only the first message on a connection pays that cost.
+     *
+     * `maxConnections` is deliberately low. Consumer SMTP — which is what a Pakistani
+     * marketplace starts on — throttles or blocks senders that open many parallel
+     * connections, and Mirwal's volume does not need them. `maxMessages` recycles a
+     * connection periodically because some servers drop long-lived ones without warning,
+     * which would otherwise surface as an intermittent send failure.
+     */
+    pool: true,
+    maxConnections: 3,
+    maxMessages: 50,
+    // A hung SMTP server must not hold a request open indefinitely.
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
   })
   return transporter
+}
+
+/**
+ * Open the pooled connection at boot, so no user request pays for establishing it.
+ *
+ * Pooling made steady-state sends roughly twice as fast, but moved the whole connection cost
+ * onto whichever message happened to be first — which is precisely the request a person is
+ * sitting in front of, waiting to be told their code is on its way.
+ *
+ * Never awaited and never throws: an unreachable mail server at boot must not stop the API
+ * starting, and the next send will try again on its own.
+ */
+export function warmMailTransport() {
+  const transport = getTransport()
+  if (!transport) return
+  transport.verify().catch(() => {
+    // Logged nowhere on purpose. A cold mail server at boot is not an incident, and the
+    // delivery ledger records every real send attempt with its own outcome.
+  })
 }
 
 /** Verify the SMTP settings actually connect. Used by the admin "test connection" action. */
@@ -74,31 +118,80 @@ export async function sendEmail({ to, subject, html, text }) {
 }
 
 /**
- * Send one SMS through a generic HTTP gateway.
+ * Send one SMS.
  *
- * Deliberately not tied to one vendor's SDK: Pakistani providers differ, and most accept a
- * POST with an api key, a recipient and a message. `SMS_API_URL` points at whichever is in
- * use; swapping providers is configuration, not a code change.
+ * Not tied to a vendor SDK, because the providers Mirwal's sellers actually use — Telenor,
+ * Jazz, BulkSMS.pk, Zong's enterprise gateway, Twilio — do not agree on a request shape, and
+ * picking one would mean a code change to switch. What they do agree on is that an SMS is a
+ * recipient, a sender id and a body over plain HTTP.
+ *
+ * `SMS_API_STYLE` selects the shape:
+ *
+ *   json  (default) POST with a JSON body and a Bearer token. Twilio-alikes, most modern APIs.
+ *   form            POST with application/x-www-form-urlencoded. Several local aggregators.
+ *   query           GET with everything in the query string. The older Pakistani gateways —
+ *                   BulkSMS.pk and most reseller panels still work this way.
+ *
+ * `SMS_PARAM_*` renames the fields, because the same three values are called `to`/`msisdn`/
+ * `mobile`/`number` depending on who wrote the API. Between the style and the field names,
+ * every provider tried so far is configuration rather than code.
  */
 export async function sendSms({ to, body }) {
   if (!env.sms.enabled) {
     return { status: 'skipped', error: 'No SMS gateway is configured.' }
   }
+
+  const fields = {
+    [env.sms.params.to]: to,
+    [env.sms.params.message]: body,
+    [env.sms.params.from]: env.sms.sender,
+  }
+
   try {
-    const response = await fetch(env.sms.apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${env.sms.apiKey}`,
-      },
-      body: JSON.stringify({ to, from: env.sms.sender, message: body }),
-      // Without this a hanging gateway would hold the request open indefinitely.
-      signal: AbortSignal.timeout(10_000),
-    })
-    const payload = await response.text()
+    let response
+    if (env.sms.style === 'query') {
+      const url = new URL(env.sms.apiUrl)
+      for (const [key, value] of Object.entries(fields)) url.searchParams.set(key, value)
+      // A query-string gateway carries its key the same way, since there is no body to put it
+      // in and these APIs predate bearer tokens.
+      if (env.sms.apiKey) url.searchParams.set(env.sms.params.key, env.sms.apiKey)
+      response = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(10_000) })
+    } else if (env.sms.style === 'form') {
+      const form = new URLSearchParams(fields)
+      if (env.sms.apiKey) form.set(env.sms.params.key, env.sms.apiKey)
+      response = await fetch(env.sms.apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: form,
+        signal: AbortSignal.timeout(10_000),
+      })
+    } else {
+      response = await fetch(env.sms.apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${env.sms.apiKey}`,
+        },
+        body: JSON.stringify(fields),
+        // Without this a hanging gateway would hold the request open indefinitely.
+        signal: AbortSignal.timeout(10_000),
+      })
+    }
+
+    const payload = (await response.text()).trim()
     if (!response.ok) {
       return { status: 'failed', provider: 'sms', error: `Gateway returned ${response.status}: ${payload.slice(0, 200)}` }
     }
+
+    /**
+     * Several Pakistani gateways answer 200 with an error in the body — "ERR: invalid mask",
+     * "Insufficient balance". Treating those as success is how a marketplace discovers its
+     * OTPs stopped three weeks ago, so an obvious failure marker in the body is a failure.
+     */
+    if (/^(err|error|fail|invalid|insufficient)/i.test(payload)) {
+      return { status: 'failed', provider: 'sms', error: `Gateway rejected the message: ${payload.slice(0, 200)}` }
+    }
+
     return { status: 'sent', provider: 'sms', ref: payload.slice(0, 200) }
   } catch (error) {
     return { status: 'failed', provider: 'sms', error: error.message }

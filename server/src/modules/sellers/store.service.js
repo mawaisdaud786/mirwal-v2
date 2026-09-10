@@ -1,5 +1,7 @@
 import { query, queryOne } from '../../db/pool.js'
 import { badRequest, conflict, notFound } from '../../lib/errors.js'
+import { parseJsonColumn } from '../../lib/json.js'
+import { getNumericSetting } from '../settings/settings.service.js'
 
 /**
  * A seller's own store.
@@ -82,6 +84,9 @@ export async function getStore(sellerId) {
       postalCode: row.postal_code,
       countryCode: row.country_code,
     },
+    about: row.about ?? null,
+    // Stored as JSON and returned parsed, so the form does not have to know it was a string.
+    businessHours: parseJsonColumn(row.business_hours, null),
     seo: { metaTitle: row.meta_title ?? null, metaDescription: row.meta_description ?? null },
     vacation: { enabled: Boolean(row.vacation_mode), message: row.vacation_message },
     payoutHold: { active: Boolean(row.payout_hold), reason: row.payout_hold_reason },
@@ -157,6 +162,12 @@ export async function updateStore(sellerId, patch) {
   if (patch.province !== undefined) push('province', truncate(patch.province, 100))
   if (patch.postalCode !== undefined) push('postal_code', truncate(patch.postalCode, 20))
 
+  if (patch.about !== undefined) push('about', truncate(patch.about, 20000))
+  // Display-only, and never filtered or reported on — the same reasoning that makes variant
+  // options JSON. Shape is validated at the schema, not here.
+  if (patch.businessHours !== undefined) {
+    push('business_hours', patch.businessHours ? JSON.stringify(patch.businessHours) : null)
+  }
   if (patch.metaTitle !== undefined) push('meta_title', truncate(patch.metaTitle, MAX.metaTitle))
   if (patch.metaDescription !== undefined) push('meta_description', truncate(patch.metaDescription, MAX.metaDescription))
 
@@ -244,3 +255,255 @@ function assertUrl(value, field) {
 }
 
 const truncate = (value, max) => (value == null ? null : String(value).trim().slice(0, max) || null)
+
+/**
+ * Store policies.
+ *
+ * `store_policies` (migration 022) holds what a buyer is actually promised. The distinction
+ * that shaped it: a return window and a dispatch time are *enforceable* — they can be shown on
+ * a product page, checked against `order_items.shipped_at`, and quoted back in a dispute —
+ * whereas a free-text "cancellation policy" is a paragraph nothing acts on.
+ *
+ * So the numeric fields are the substance and the text fields are the explanation, rather than
+ * six paragraphs pretending to be rules.
+ *
+ * Every numeric field is nullable, meaning "use the platform default". That is deliberate: a
+ * NULL is honest about the seller not having chosen, which a copied-in default value is not —
+ * and it means raising the platform minimum later lifts every store that never overrode it.
+ */
+export async function getPolicies(sellerId) {
+  const row = await queryOne('SELECT * FROM store_policies WHERE seller_id = ?', [sellerId])
+
+  // Read alongside the seller's own values so the form can show what a blank field will
+  // actually mean, rather than an empty box the seller has to guess about.
+  const [platformWindow, platformDispatch] = await Promise.all([
+    getNumericSetting('orders.return_window_days', { fallback: 7, max: 365 }),
+    getNumericSetting('orders.dispatch_sla_hours', { fallback: 48, max: 8760 }),
+  ])
+
+  return {
+    returnsAccepted: row ? Boolean(row.returns_accepted) : true,
+    returnWindowDays: row?.return_window_days ?? null,
+    returnShippingPaidBy: row?.return_shipping_paid_by ?? 'buyer',
+    exchangeOffered: row ? Boolean(row.exchange_offered) : false,
+    dispatchDays: row?.dispatch_days ?? null,
+    warrantyText: row?.warranty_text ?? null,
+    returnsText: row?.returns_text ?? null,
+    shippingText: row?.shipping_text ?? null,
+    defaults: {
+      returnWindowDays: platformWindow,
+      dispatchDays: Math.ceil(platformDispatch / 24),
+    },
+  }
+}
+
+/**
+ * Save policies.
+ *
+ * Upserted, because a seller who has never opened this page has no row and should not need one
+ * created by a separate call.
+ *
+ * The one rule enforced here rather than trusted: a seller may offer a *longer* return window
+ * than Mirwal requires but never a shorter one. Buyer protection is Mirwal's promise, and a
+ * seller cannot opt out of it by typing 2 into a box — so a shorter value is raised to the
+ * platform minimum and the caller is told that happened.
+ *
+ * The patch is merged onto what is already stored before the upsert. Without that merge this
+ * endpoint silently destroyed data: `ON DUPLICATE KEY UPDATE` writes every column, so sending
+ * only `returnWindowDays` reset the dispatch promise and the return-postage rule back to their
+ * defaults. Every field is optional in the schema, so a partial patch is not merely possible
+ * but the normal case.
+ */
+export async function updatePolicies(sellerId, patch) {
+  const platformWindow = await getNumericSetting('orders.return_window_days', { fallback: 7, max: 365 })
+
+  const existing = await queryOne('SELECT * FROM store_policies WHERE seller_id = ?', [sellerId])
+  const keep = (key, column, fallback) => (
+    patch[key] !== undefined ? patch[key] : (existing ? existing[column] : fallback)
+  )
+
+  let clamped = false
+  let windowDays = keep('returnWindowDays', 'return_window_days', null)
+  if (windowDays != null && windowDays < platformWindow) {
+    windowDays = platformWindow
+    clamped = true
+  }
+
+  await query(
+    `INSERT INTO store_policies
+       (seller_id, returns_accepted, return_window_days, return_shipping_paid_by,
+        exchange_offered, dispatch_days, warranty_text, returns_text, shipping_text)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       returns_accepted = VALUES(returns_accepted),
+       return_window_days = VALUES(return_window_days),
+       return_shipping_paid_by = VALUES(return_shipping_paid_by),
+       exchange_offered = VALUES(exchange_offered),
+       dispatch_days = VALUES(dispatch_days),
+       warranty_text = VALUES(warranty_text),
+       returns_text = VALUES(returns_text),
+       shipping_text = VALUES(shipping_text),
+       updated_at = NOW(3)`,
+    [
+      sellerId,
+      keep('returnsAccepted', 'returns_accepted', 1) ? 1 : 0,
+      windowDays,
+      keep('returnShippingPaidBy', 'return_shipping_paid_by', 'buyer'),
+      keep('exchangeOffered', 'exchange_offered', 0) ? 1 : 0,
+      keep('dispatchDays', 'dispatch_days', null),
+      truncate(keep('warrantyText', 'warranty_text', null), 2000),
+      truncate(keep('returnsText', 'returns_text', null), 2000),
+      truncate(keep('shippingText', 'shipping_text', null), 2000),
+    ],
+  )
+
+  return {
+    saved: true,
+    notice: clamped
+      ? `Mirwal's minimum return window is ${platformWindow} days, so that is what buyers will see.`
+      : null,
+  }
+}
+
+/**
+ * A seller's identity details.
+ *
+ * These columns are filled when an application is approved and, until now, could never be
+ * touched again: `updateStore` deliberately refuses them, because letting a seller rewrite a
+ * legal name or a CNIC after verification would make the verified badge meaningless — a
+ * verified store could be renamed into an impersonation the day after approval.
+ *
+ * But "never editable" is also wrong. A seller created before applications existed has none of
+ * these. A CNIC gets mistyped. A sole trader registers a company and acquires an NTN. So the
+ * rule is narrower than "no": **a blank field may be filled in freely; a field that has already
+ * been verified may be changed, and doing so costs the verification it was carrying.**
+ *
+ * That trade is stated to the seller rather than applied silently — someone correcting a typo
+ * needs to know it sends them back through review.
+ */
+export async function getKyc(sellerId) {
+  const row = await queryOne(
+    `SELECT seller_type, verification_level, verified_at, legal_name, cnic, date_of_birth,
+            ntn, strn, business_reg_no, business_type
+       FROM sellers WHERE id = ?`,
+    [sellerId],
+  )
+  if (!row) throw notFound('Store not found.')
+
+  const isBusiness = row.seller_type === 'business'
+  const verified = row.verification_level !== 'none' && row.verification_level !== 'basic'
+
+  return {
+    sellerType: row.seller_type,
+    verificationLevel: row.verification_level,
+    verifiedAt: row.verified_at,
+    // Masked, like every other identifier Mirwal shows back. A seller knows their own CNIC;
+    // rendering it in full only creates something to be shoulder-surfed or screenshotted.
+    cnic: row.cnic ? `${row.cnic.slice(0, 5)}•••••••${row.cnic.slice(-1)}` : null,
+    dateOfBirth: row.date_of_birth,
+    legalName: row.legal_name || null,
+    ntn: row.ntn,
+    strn: row.strn,
+    businessRegNo: row.business_reg_no,
+    businessType: row.business_type,
+    // What is still outstanding for this seller type, so the panel can show a checklist rather
+    // than a wall of optional boxes.
+    missing: [
+      !row.cnic && 'cnic',
+      !row.date_of_birth && 'dateOfBirth',
+      isBusiness && !row.legal_name && 'legalName',
+      isBusiness && !row.ntn && 'ntn',
+      isBusiness && row.business_type === 'private_limited' && !row.business_reg_no && 'businessRegNo',
+    ].filter(Boolean),
+    // Changing any of these once verified sends the store back through review.
+    locked: verified,
+  }
+}
+
+/** Fields whose change costs verification, mapped to their column. */
+const IDENTITY_COLUMNS = {
+  cnic: 'cnic',
+  dateOfBirth: 'date_of_birth',
+  legalName: 'legal_name',
+  ntn: 'ntn',
+  strn: 'strn',
+  businessRegNo: 'business_reg_no',
+  businessType: 'business_type',
+}
+
+export async function updateKyc(sellerId, patch) {
+  const current = await queryOne(
+    `SELECT verification_level, verified_badge, cnic, date_of_birth, legal_name, ntn, strn,
+            business_reg_no, business_type
+       FROM sellers WHERE id = ?`,
+    [sellerId],
+  )
+  if (!current) throw notFound('Store not found.')
+
+  const sets = []
+  const params = []
+  const changedVerified = []
+
+  for (const [field, column] of Object.entries(IDENTITY_COLUMNS)) {
+    if (patch[field] === undefined) continue
+
+    const next = field === 'cnic'
+      // Accepted as printed on the card — 12345-6789012-3 — because demanding thirteen bare
+      // digits is a form nobody can fill in.
+      ? String(patch[field] ?? '').replace(/\D/g, '')
+      : patch[field]
+
+    if (field === 'cnic' && next && !/^\d{13}$/.test(next)) {
+      throw badRequest('A CNIC is 13 digits.', 'INVALID_CNIC', [{ field: 'cnic', message: 'Check the number on your card.' }])
+    }
+
+    const before = current[column]
+    if (String(before ?? '') === String(next ?? '')) continue
+
+    // Filling a blank is free. Changing something that was checked is not.
+    if (before) changedVerified.push(field)
+
+    sets.push(`${column} = ?`)
+    params.push(next || null)
+  }
+
+  if (!sets.length) throw badRequest('No changes were supplied.', 'NOTHING_TO_UPDATE')
+
+  /**
+   * A changed identity is an unverified identity.
+   *
+   * Dropping the level and the badge together is the whole point: a badge that survives a
+   * change of legal name is a badge that says nothing. Documents are not invalidated — the
+   * reviewer decides whether the ones on file still support the new details.
+   */
+  const wasVerified = current.verification_level !== 'none' && current.verification_level !== 'basic'
+  const downgrade = wasVerified && changedVerified.length > 0
+
+  if (downgrade) {
+    sets.push("verification_level = 'basic'", 'verified_badge = 0', 'verified_at = NULL')
+  }
+
+  sets.push('updated_at = NOW(3)')
+
+  try {
+    await query(`UPDATE sellers SET ${sets.join(', ')} WHERE id = ?`, [...params, sellerId])
+  } catch (error) {
+    // `uq_sellers_cnic` / `uq_sellers_ntn`: one identity, one store. The constraint is what
+    // actually wins the race; this turns it into a sentence a seller can act on.
+    if (error.code === 'ER_DUP_ENTRY') {
+      throw conflict(
+        'Another Mirwal store is already registered to those details. Contact support if that is wrong.',
+        'IDENTITY_ALREADY_REGISTERED',
+      )
+    }
+    throw error
+  }
+
+  return {
+    updated: changedVerified.length || sets.length - 1,
+    downgraded: downgrade,
+    notice: downgrade
+      ? 'Your details changed, so your store is back in review. Your documents are still on file.'
+      : null,
+  }
+}

@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { requireAuth, requireRole, requirePermission } from '../../middleware/auth.js'
 import { validate } from '../../middleware/validate.js'
-import { orderIdSchema } from '../orders/orders.schemas.js'
+import { orderIdSchema, listOrdersAdminSchema } from '../orders/orders.schemas.js'
 import * as ordersController from '../orders/orders.controller.js'
 import { analyticsRangeSchema } from './analytics.schemas.js'
 import * as analyticsController from './analytics.controller.js'
@@ -14,6 +14,14 @@ import * as support from '../support/support.controller.js'
 import * as settings from '../settings/settings.controller.js'
 import * as operations from './operations.controller.js'
 import * as messaging from '../messaging/messaging.controller.js'
+import * as applications from '../sellers/applications.controller.js'
+import * as kyc from './kyc.controller.js'
+import * as shipments from '../orders/shipments.controller.js'
+import * as safety from '../safety/safety.controller.js'
+import {
+  listApplicationsSchema, applicationIdSchema, requestInfoSchema,
+  approveApplicationSchema, rejectApplicationSchema,
+} from '../sellers/applications.schemas.js'
 import {
   listTemplatesSchema, templateParamSchema, updateTemplateSchema, listDeliveriesSchema,
   sendTestSchema, listDocumentsSchema, reviewDocumentSchema, idParamSchema as msgIdParamSchema,
@@ -58,6 +66,9 @@ import {
   listSellersSchema, sellerIdSchema, sellerReasonSchema,
   listAuditSchema,
 } from './management.schemas.js'
+import * as brandAuth from '../catalog/brandAuth.controller.js'
+import * as returns from '../orders/returns.controller.js'
+import * as fulfilment from '../orders/fulfilment.controller.js'
 
 /**
  * Admin-scoped routes.
@@ -76,13 +87,16 @@ export const adminRouter = Router()
 adminRouter.use(requireAuth, requireRole('admin', 'super_admin'))
 
 // --- Orders -----------------------------------------------------------------
-adminRouter.get('/orders', requirePermission('order.read'), ordersController.listOrdersAdmin)
+// Declared before `/orders/:id` so the literal segment is not swallowed by the parameter.
+adminRouter.get('/orders/counts', requirePermission('order.read'), ordersController.orderCountsAdmin)
+adminRouter.get('/orders', requirePermission('order.read'), validate(listOrdersAdminSchema, 'query'), ordersController.listOrdersAdmin)
 adminRouter.get('/orders/:id', requirePermission('order.read'), validate(orderIdSchema, 'params'), ordersController.getOrderAdmin)
 
 // --- Reporting --------------------------------------------------------------
 adminRouter.get('/analytics', requirePermission('analytics.read'), validate(analyticsRangeSchema, 'query'), analyticsController.getOverview)
 adminRouter.get('/customers', requirePermission('order.read'), customersController.getCustomers)
-adminRouter.get('/reviews', requirePermission('order.read'), reviewsController.listForAdmin)
+adminRouter.get('/customers/:id', requirePermission('order.read'), customersController.getCustomer)
+adminRouter.get('/reviews', requirePermission('order.read'), validate(reviewsController.listReviewsSchema, 'query'), reviewsController.listForAdmin)
 adminRouter.get('/disputes', requirePermission('order.read'), disputesController.listDisputes)
 
 // --- Products ---------------------------------------------------------------
@@ -191,6 +205,15 @@ adminRouter.get('/access-matrix', requirePermission('role.manage'), settings.acc
 adminRouter.get('/roles/:slug', requirePermission('role.manage'), validate(roleSlugSchema, 'params'), settings.getRole)
 adminRouter.put('/roles/:slug/permissions', requirePermission('role.manage'), validate(roleSlugSchema, 'params'), validate(setRolePermissionsSchema), settings.setRolePermissions)
 
+/**
+ * What needs doing right now, across every queue.
+ *
+ * Deliberately gated on nothing beyond being staff: the service filters to the queues the
+ * caller holds a permission for, so a verification agent sees applications and a finance
+ * manager sees payouts, and neither is shown work they cannot do.
+ */
+adminRouter.get('/work-queue', operations.workQueue)
+
 // --- Staff, sessions and accounts --------------------------------------------
 adminRouter.get('/staff', requirePermission('user.read'), operations.listStaff)
 adminRouter.get('/sessions', requirePermission('user.read'), validate(listSessionsSchema, 'query'), operations.listSessions)
@@ -236,11 +259,46 @@ adminRouter.get('/messaging/deliveries', requirePermission('settings.manage'), v
 adminRouter.post('/messaging/send-test', requirePermission('settings.manage'), validate(sendTestSchema), messaging.sendTest)
 
 // --- Seller verification documents --------------------------------------------
-// `seller.approve` rather than `seller.read`: seeing someone's CNIC is the same authority as
-// deciding whether their store may trade.
-adminRouter.get('/seller-documents', requirePermission('seller.approve'), validate(listDocumentsSchema, 'query'), messaging.listDocumentsAdmin)
-adminRouter.get('/seller-documents/:id/file', requirePermission('seller.approve'), validate(msgIdParamSchema, 'params'), messaging.downloadDocumentAdmin)
-adminRouter.patch('/seller-documents/:id', requirePermission('seller.approve'), validate(msgIdParamSchema, 'params'), validate(reviewDocumentSchema), messaging.reviewDocument)
+//
+// Now gated by `seller.kyc.view` / `seller.kyc.decide` rather than `seller.approve`.
+//
+// Those were the same key, which meant every operator who could decide an application could
+// also read every CNIC and bank letter attached to it, whether their job needed it or not.
+// They are different authorities: triaging an obviously incomplete application requires no
+// identity data at all. `seller.approve` is kept as an alternative on each route so an
+// existing admin session does not lose access mid-deploy.
+adminRouter.get('/seller-documents', requirePermission('seller.kyc.view', 'seller.approve'), validate(listDocumentsSchema, 'query'), messaging.listDocumentsAdmin)
+adminRouter.get('/seller-documents/:id/file', requirePermission('seller.kyc.view', 'seller.approve'), validate(msgIdParamSchema, 'params'), messaging.downloadDocumentAdmin)
+adminRouter.patch('/seller-documents/:id', requirePermission('seller.kyc.decide', 'seller.approve'), validate(msgIdParamSchema, 'params'), validate(reviewDocumentSchema), messaging.reviewDocument)
+
+// --- Seller applications -------------------------------------------------------
+//
+// The queue the admin panel has always shown and nothing could ever fill: before migration
+// 020 there was no application table and no endpoint to create one, so "Applications" listed
+// stores with status = 'pending' — a status only the database seeder could produce.
+adminRouter.get('/applications/counts', requirePermission('seller.application.read', 'seller.read'), applications.counts)
+adminRouter.get('/applications', requirePermission('seller.application.read', 'seller.read'), validate(listApplicationsSchema, 'query'), applications.list)
+adminRouter.get('/applications/:id', requirePermission('seller.application.read', 'seller.read'), validate(applicationIdSchema, 'params'), applications.detail)
+adminRouter.post('/applications/:id/claim', requirePermission('seller.application.decide', 'seller.approve'), validate(applicationIdSchema, 'params'), applications.claim)
+adminRouter.post('/applications/:id/request-info', requirePermission('seller.application.decide', 'seller.approve'), validate(applicationIdSchema, 'params'), validate(requestInfoSchema), applications.requestInfo)
+adminRouter.post('/applications/:id/approve', requirePermission('seller.application.decide', 'seller.approve'), validate(applicationIdSchema, 'params'), validate(approveApplicationSchema), applications.approve)
+adminRouter.post('/applications/:id/reject', requirePermission('seller.application.decide', 'seller.approve'), validate(applicationIdSchema, 'params'), validate(rejectApplicationSchema), applications.reject)
+
+// --- Payout account verification -----------------------------------------------
+//
+// `seller.bank.*`, not `settings.manage`. Verifying where a seller's money goes is a finance
+// control; it has nothing to do with editing a banner, and the old key covered both.
+adminRouter.get('/bank-accounts', requirePermission('seller.bank.view', 'payout.read'), validate(kyc.listBankAccountsSchema, 'query'), kyc.listBankAccounts)
+adminRouter.get('/bank-accounts/:id/reveal', requirePermission('seller.bank.verify'), validate(kyc.idParamSchema, 'params'), kyc.revealBankAccount)
+adminRouter.patch('/bank-accounts/:id', requirePermission('seller.bank.verify'), validate(kyc.idParamSchema, 'params'), validate(kyc.reviewBankAccountSchema), kyc.reviewBankAccount)
+
+// --- PII access log ------------------------------------------------------------
+//
+// Deliberately gated by its own key, and NOT by the permission that grants access to the
+// documents themselves: the people who read identity data should not be the people who decide
+// what the record of that reading says.
+adminRouter.get('/pii-access', requirePermission('pii.audit.read'), validate(kyc.listPiiSchema, 'query'), kyc.listAccess)
+adminRouter.get('/pii-access/summary', requirePermission('pii.audit.read'), kyc.accessSummary)
 
 // --- Analytics: marketplace, sellers, customers, finance, search ------------
 //
@@ -259,6 +317,56 @@ adminRouter.get('/insights/stores/:id', requirePermission('seller.read'), platfo
 //
 // Read-only apart from settling a manual refund. Approving a return stays with the seller it
 // was filed against.
+
+// --- Shipments and the order timeline -------------------------------------------
+//
+// Admin gets read plus the ability to correct a courier status, which support needs when a
+// seller cannot reach the carrier. The timeline is staff-scoped, so it names the actor.
+adminRouter.patch('/shipments/:id', requirePermission('order.write'), validate(shipments.shipmentIdSchema, 'params'), validate(shipments.updateShipmentSchema), shipments.updateByAdmin)
+adminRouter.get('/orders/:id/timeline', requirePermission('order.read'), validate(shipments.orderIdParamSchema, 'params'), shipments.timelineForStaff)
+
+/**
+ * The dispute queue.
+ *
+ * Separate from the read-only `/returns` listing below, and gated on its own permission:
+ * deciding a disputed return moves money away from a seller against their stated decision,
+ * which is not the same authority as being able to read an order.
+ */
+/**
+ * Post-purchase intervention.
+ *
+ * Cancelling on someone's behalf and refunding without a return are discretionary spends of
+ * Mirwal's money, so each has its own permission rather than riding on `order.write` — support
+ * can cancel and read, finance can refund, and neither inherits the other.
+ */
+adminRouter.patch(
+  '/order-items/:id/cancel',
+  requirePermission('order.cancel'),
+  validate(fulfilment.orderItemIdSchema, 'params'),
+  validate(fulfilment.adminCancelSchema),
+  fulfilment.cancelAsAdmin,
+)
+adminRouter.post(
+  '/orders/:id/refund',
+  requirePermission('order.refund.manual'),
+  validate(fulfilment.orderIdSchema, 'params'),
+  validate(fulfilment.manualRefundSchema),
+  fulfilment.refundManually,
+)
+adminRouter.get('/orders/:id/invoice', requirePermission('order.invoice.read'), validate(fulfilment.orderIdSchema, 'params'), fulfilment.invoiceForAdmin)
+adminRouter.get('/orders/:id/messages/:sellerId', requirePermission('order.message.read'), validate(fulfilment.threadParamsSchema, 'params'), fulfilment.adminRead)
+adminRouter.post(
+  '/orders/:id/messages/:sellerId',
+  requirePermission('order.message.read'),
+  validate(fulfilment.threadParamsSchema, 'params'),
+  validate(fulfilment.adminMessageSchema),
+  fulfilment.adminWrite,
+)
+
+adminRouter.get('/returns/disputes', requirePermission('order.return.adjudicate'), validate(returns.listSchema, 'query'), returns.adminList)
+adminRouter.get('/returns/disputes/:id', requirePermission('order.return.adjudicate'), validate(returns.idSchema, 'params'), returns.adminGet)
+adminRouter.post('/returns/disputes/:id/decide', requirePermission('order.return.adjudicate'), validate(returns.idSchema, 'params'), validate(returns.decideSchema), returns.adminDecide)
+adminRouter.post('/returns/disputes/:id/messages', requirePermission('order.return.adjudicate'), validate(returns.idSchema, 'params'), validate(returns.messageSchema), returns.adminNote)
 
 adminRouter.get('/returns', requirePermission('order.read'), validate(listReturnsSchema, 'query'), platform.listReturns)
 adminRouter.get('/returns/:id', requirePermission('order.read'), validate(platformIdParamSchema, 'params'), platform.getReturn)
@@ -306,3 +414,52 @@ adminRouter.post('/security/two-factor/setup', platform.beginTwoFactor)
 adminRouter.post('/security/two-factor/confirm', validate(twoFactorCodeSchema), platform.confirmTwoFactor)
 adminRouter.post('/security/two-factor/disable', validate(passwordConfirmSchema), platform.disableTwoFactor)
 adminRouter.post('/security/two-factor/backup-codes', validate(passwordConfirmSchema), platform.regenerateBackupCodes)
+
+// --- Trust and safety -----------------------------------------------------------
+//
+// The case queue, enforcement, appeals and review moderation. Before this, upholding a product
+// report did nothing — no takedown, no warning, no record — and "Disputes" was a read-only
+// view where the seller decided complaints filed against themselves.
+//
+// `case.*` and `review.moderate` rather than `order.read`: deciding a counterfeit report is
+// not the same authority as reading an order, and a Customer Support role should not silently
+// acquire the power to suspend a store.
+
+adminRouter.get('/cases/stats', requirePermission('case.read', 'order.read'), safety.stats)
+adminRouter.get('/cases', requirePermission('case.read', 'order.read'), validate(safety.listCasesSchema, 'query'), safety.list)
+adminRouter.get('/cases/:id', requirePermission('case.read', 'order.read'), validate(safety.caseIdSchema, 'params'), safety.detail)
+adminRouter.post('/cases/:id/assign', requirePermission('case.manage'), validate(safety.caseIdSchema, 'params'), safety.assign)
+adminRouter.post('/cases/:id/messages', requirePermission('case.manage'), validate(safety.caseIdSchema, 'params'), validate(safety.caseMessageSchema), safety.message)
+adminRouter.post('/cases/:id/resolve', requirePermission('case.manage'), validate(safety.caseIdSchema, 'params'), validate(safety.resolveCaseSchema), safety.resolve)
+
+// Enforcement is gated by `seller.enforce`, which only Super Admin and the Risk Manager role
+// hold. Suspending a store is not an operational convenience.
+adminRouter.post('/sellers/:id/enforce', requirePermission('seller.enforce'), validate(safety.enforcementSchema), safety.enforce)
+adminRouter.get('/sellers/:id/enforcement', requirePermission('seller.read'), safety.sellerHistory)
+
+/**
+ * Trust and risk.
+ *
+ * `risk.read`, not `seller.read`: the risk score is an internal judgement about a person's
+ * likelihood of causing harm, and it is not something every operator with a seller list needs.
+ */
+adminRouter.get('/sellers/:id/scores', requirePermission('risk.read', 'seller.enforce'), safety.sellerScores)
+/**
+ * Brand authorisation — the counterfeit control that had a table and no code.
+ *
+ * `catalog.brand.write` gates the on/off switch for a brand, and product moderators decide
+ * individual requests: deciding who may sell Nike is a moderation judgement, not a catalogue
+ * edit.
+ */
+adminRouter.get('/brand-authorizations', requirePermission('catalog.product.approve', 'catalog.brand.read'), validate(brandAuth.listSchema, 'query'), brandAuth.list)
+adminRouter.patch('/brand-authorizations/:id', requirePermission('catalog.product.approve'), validate(brandAuth.decideSchema), brandAuth.decide)
+adminRouter.patch('/brands/:slug/gate', requirePermission('catalog.brand.write'), validate(brandAuth.gateSchema), brandAuth.setGate)
+
+adminRouter.get('/risk/sellers', requirePermission('risk.read', 'seller.enforce'), safety.riskQueue)
+adminRouter.post('/enforcement/:id/appeal-decision', requirePermission('seller.enforce'), validate(safety.caseIdSchema, 'params'), validate(safety.appealDecisionSchema), safety.decideAppeal)
+
+// Review moderation. `AUDIT.REVIEW_DELETED` has existed as a constant since the audit log was
+// built, with no endpoint behind it — this is that endpoint, and it hides rather than deletes.
+adminRouter.get('/reviews/queue', requirePermission('review.moderate', 'order.read'), validate(safety.reviewQueueSchema, 'query'), safety.reviewQueue)
+adminRouter.get('/reviews/patterns', requirePermission('review.moderate', 'risk.read'), safety.reviewPatterns)
+adminRouter.patch('/reviews/:id/moderate', requirePermission('review.moderate'), validate(safety.caseIdSchema, 'params'), validate(safety.moderateReviewSchema), safety.moderateReview)

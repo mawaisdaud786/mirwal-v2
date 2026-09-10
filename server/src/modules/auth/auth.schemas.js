@@ -33,10 +33,17 @@ export const loginSchema = z.object({
   totpCode: z.string().trim().max(20).optional(),
 })
 
-/** Name and phone only — email, status and roles are deliberately not editable here. */
+/** Customer-owned details only — email, status and roles are deliberately not editable here. */
 export const updateProfileSchema = z.object({
   fullName: z.string().trim().min(1).max(150),
   phone: z.string().trim().max(20).optional().default(''),
+  city: z.string().trim().max(80).optional().default(''),
+  country: z.string().trim().max(80).optional().default(''),
+  language: z.string().trim().max(40).optional().default(''),
+  address: z.string().trim().max(500).optional().default(''),
+  paymentMethod: z.enum(['cod', 'card', 'easypaisa', 'jazzcash']).optional(),
+  notificationChannels: z.record(z.boolean()).optional(),
+  notificationPreferences: z.record(z.boolean()).optional(),
 })
 
 /**

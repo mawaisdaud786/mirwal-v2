@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { validate } from '../../middleware/validate.js'
 import { optionalAuth } from '../../middleware/auth.js'
 import { listProductsSchema, slugSchema } from './catalog.schemas.js'
+import { browseLimiter, reportLimiter } from '../../middleware/rateLimit.js'
 import * as controller from './catalog.controller.js'
 import * as operations from '../admin/operations.controller.js'
 import { createReportSchema, productSlugParamSchema } from '../admin/operations.schemas.js'
@@ -11,7 +12,9 @@ import { quoteSchema } from '../shipping/shipping.schemas.js'
 // Public reads, plus the one public write: reporting a listing.
 export const catalogRouter = Router()
 
-catalogRouter.get('/products', validate(listProductsSchema, 'query'), controller.listProducts)
+// The scraping surface. Anonymous traffic keys on address here, which is the one place that
+// is still the right unit — a crawler pulling the whole catalogue does not sign in.
+catalogRouter.get('/products', browseLimiter, validate(listProductsSchema, 'query'), controller.listProducts)
 // Declared before /products/:slug so "facets" is not matched as a product slug.
 catalogRouter.get('/products/facets', controller.getFacets)
 catalogRouter.get('/products/:slug', validate(slugSchema, 'params'), controller.getProduct)
@@ -27,6 +30,7 @@ catalogRouter.get('/products/:slug', validate(slugSchema, 'params'), controller.
 catalogRouter.post(
   '/products/:slug/report',
   optionalAuth,
+  reportLimiter,
   validate(productSlugParamSchema, 'params'),
   validate(createReportSchema),
   operations.createProductReport,

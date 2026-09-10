@@ -2,6 +2,7 @@ import { query, queryOne } from '../../db/pool.js'
 import { badRequest, notFound } from '../../lib/errors.js'
 import { parseJsonColumn } from '../../lib/json.js'
 import { sendEmail, sendSms, renderTemplate, messagingCapabilities } from '../../lib/mailer.js'
+import { mayNotify } from '../notifications/preferences.service.js'
 
 /**
  * Transactional messaging: templates, sending, and the delivery ledger.
@@ -131,6 +132,163 @@ const DEFAULTS = [
     variables: ['code'],
     body: 'Your Mirwal delivery code is {{code}}. Share it with the courier to confirm receipt.',
   },
+  // --- Account verification (migration 020) ---------------------------------
+  //
+  // These are the reason `users.email_verified_at` and `phone_verified_at` could never be
+  // written before: the columns existed since migration 001, but there was no message to
+  // carry a token, so nothing could ever prove an address.
+  {
+    key: 'account.verify_email', channel: 'email', name: 'Confirm your email address',
+    description: 'Sent when someone asks to verify their email, and before a seller application can be submitted.',
+    subject: 'Confirm your Mirwal email address',
+    variables: ['name', 'link', 'minutes'],
+    body: `<p>Hello {{name}},</p>
+<p>Confirm this email address to finish setting up your Mirwal account.</p>
+<p><a href="{{link}}">Confirm my email address</a></p>
+<p>This link works for {{minutes}} minutes and can be used once. If you did not ask for it, you can ignore this message.</p>
+<p>— Mirwal</p>`,
+  },
+  {
+    key: 'account.verify_phone', channel: 'sms', name: 'Mobile verification code',
+    description: 'Six-digit code sent by SMS to confirm a mobile number.',
+    subject: null,
+    variables: ['name', 'code', 'minutes'],
+    body: 'Your Mirwal verification code is {{code}}. It expires in {{minutes}} minutes. Mirwal will never ask you for this code.',
+  },
+
+  // --- Seller onboarding ----------------------------------------------------
+  {
+    key: 'seller.application_received', channel: 'email', name: 'Seller application received',
+    description: 'Confirms to an applicant that their application is in the queue.',
+    subject: 'We have your Mirwal seller application',
+    variables: ['sellerName', 'storeName'],
+    body: `<p>Hello {{sellerName}},</p>
+<p>Thank you for applying to sell on Mirwal. Your application for <strong>{{storeName}}</strong> is with our team.</p>
+<p>Most applications are reviewed within two working days. We will email you as soon as there is a decision.</p>
+<p>— Mirwal</p>`,
+  },
+  {
+    key: 'seller.application_more_info', channel: 'email', name: 'More information needed',
+    description: 'Sent when a reviewer needs something specific before deciding.',
+    subject: 'We need a little more information about {{storeName}}',
+    variables: ['sellerName', 'storeName', 'message'],
+    body: `<p>Hello {{sellerName}},</p>
+<p>We are reviewing your application for <strong>{{storeName}}</strong> and need one more thing:</p>
+<blockquote>{{message}}</blockquote>
+<p>Sign in to your Mirwal account to supply it. Your application stays open in the meantime.</p>
+<p>— Mirwal</p>`,
+  },
+
+  // --- Payout destination ---------------------------------------------------
+  //
+  // Sent to the address on file BEFORE the change, not the one after it. If the change was
+  // made by someone who has taken over the account, this message is the only thing that
+  // reaches the real owner in time to stop the money leaving.
+  {
+    key: 'security.bank_account_changed', channel: 'email', name: 'Payout account changed',
+    description: 'Security alert sent when a seller changes where their earnings are sent.',
+    subject: 'Your Mirwal payout account was changed',
+    variables: ['sellerName', 'storeName', 'last4', 'hours'],
+    body: `<p>Hello {{sellerName}},</p>
+<p>The payout account for <strong>{{storeName}}</strong> was changed to an account ending <strong>{{last4}}</strong>.</p>
+<p>Withdrawals are held for {{hours}} hours while we verify it.</p>
+<p><strong>If you did not make this change, contact Mirwal support immediately</strong> — your account may have been accessed by someone else.</p>
+<p>— Mirwal</p>`,
+  },
+
+  // --- Security alerts ------------------------------------------------------
+  {
+    key: 'security.new_device_login', channel: 'email', name: 'New sign-in',
+    description: 'Sent when an account is signed in to from a device it has not been seen on.',
+    subject: 'New sign-in to your Mirwal account',
+    variables: ['name', 'device', 'when'],
+    body: `<p>Hello {{name}},</p>
+<p>Your Mirwal account was signed in to from a new device.</p>
+<p><strong>{{device}}</strong><br />{{when}}</p>
+<p>If this was you, nothing to do. If it was not, change your password and sign out of other sessions from your account security page.</p>
+<p>— Mirwal</p>`,
+  },
+  {
+    key: 'security.email_changed', channel: 'email', name: 'Email address changed',
+    description: 'Sent to the previous address when an account email is changed.',
+    subject: 'Your Mirwal email address was changed',
+    variables: ['name', 'newEmail'],
+    body: `<p>Hello {{name}},</p>
+<p>The email address on your Mirwal account was changed to {{newEmail}}.</p>
+<p>If you did not make this change, contact Mirwal support immediately.</p>
+<p>— Mirwal</p>`,
+  },
+
+  // --- Fulfilment -----------------------------------------------------------
+  {
+    key: 'order.out_for_delivery', channel: 'sms', name: 'Out for delivery',
+    description: 'Sent when a courier marks a parcel out for delivery.',
+    subject: null,
+    variables: ['orderNumber', 'amount'],
+    body: 'Your Mirwal order {{orderNumber}} is out for delivery today. Amount due on delivery: {{amount}}.',
+  },
+  {
+    key: 'order.delivery_failed', channel: 'email', name: 'Delivery attempt failed',
+    description: 'Sent when a courier could not deliver a parcel.',
+    subject: 'We could not deliver order {{orderNumber}}',
+    variables: ['customerName', 'orderNumber', 'reason'],
+    body: `<p>Hello {{customerName}},</p>
+<p>The courier could not deliver order <strong>{{orderNumber}}</strong>.</p>
+<p>{{reason}}</p>
+<p>They will try again. You can also contact us from your Mirwal account.</p>
+<p>— Mirwal</p>`,
+  },
+
+  // --- Payouts --------------------------------------------------------------
+  {
+    key: 'payout.paid', channel: 'email', name: 'Payout sent',
+    description: 'Sent to a seller when a withdrawal has actually left.',
+    subject: 'Your Mirwal payout {{reference}} has been sent',
+    variables: ['sellerName', 'reference', 'amount', 'destination'],
+    body: `<p>Hello {{sellerName}},</p>
+<p>Your withdrawal <strong>{{reference}}</strong> of {{amount}} has been sent to {{destination}}.</p>
+<p>Bank transfers usually arrive within one working day.</p>
+<p>— Mirwal</p>`,
+  },
+  {
+    key: 'payout.failed', channel: 'email', name: 'Payout failed',
+    description: 'Sent when a transfer could not be completed.',
+    subject: 'Your Mirwal payout {{reference}} could not be sent',
+    variables: ['sellerName', 'reference', 'amount', 'reason'],
+    body: `<p>Hello {{sellerName}},</p>
+<p>We could not send your withdrawal <strong>{{reference}}</strong> of {{amount}}.</p>
+<p>{{reason}}</p>
+<p>The amount is back in your available balance. Please check your payout account details and try again.</p>
+<p>— Mirwal</p>`,
+  },
+
+  // --- Enforcement ----------------------------------------------------------
+  //
+  // An enforcement action the seller is not told about is indistinguishable from a bug, and
+  // it makes an appeal impossible because they do not know there is anything to appeal.
+  {
+    key: 'seller.enforcement_action', channel: 'email', name: 'Action taken on your store',
+    description: 'Sent when Mirwal warns, restricts or suspends a store.',
+    subject: 'Mirwal has taken action on {{storeName}}',
+    variables: ['sellerName', 'storeName', 'action', 'reason', 'appealNote'],
+    body: `<p>Hello {{sellerName}},</p>
+<p>Mirwal has taken the following action on <strong>{{storeName}}</strong>:</p>
+<p><strong>{{action}}</strong></p>
+<p>{{reason}}</p>
+<p>{{appealNote}}</p>
+<p>— Mirwal Trust &amp; Safety</p>`,
+  },
+  {
+    key: 'product.delisted', channel: 'email', name: 'Listing removed',
+    description: 'Sent when a live listing is taken down for a policy reason.',
+    subject: 'A listing was removed from {{storeName}}',
+    variables: ['sellerName', 'storeName', 'productName', 'reason'],
+    body: `<p>Hello {{sellerName}},</p>
+<p><strong>{{productName}}</strong> has been removed from Mirwal.</p>
+<p>{{reason}}</p>
+<p>You can appeal this from the seller panel if you believe it is wrong.</p>
+<p>— Mirwal Trust &amp; Safety</p>`,
+  },
 ]
 
 /** Insert any missing defaults, then return everything. Same lazy pattern as settings. */
@@ -235,6 +393,22 @@ export async function send(key, { to, userId = null, variables = {}, channel = '
 
   try {
     if (!to) return recordDelivery({ key, channel, to: '', userId, subject, variables, outcome: { status: 'skipped', error: 'No recipient address.' } })
+
+    /**
+     * What this person asked to receive.
+     *
+     * Checked here rather than at each of the twenty call sites, because a gate every caller
+     * has to remember is a gate that will be forgotten by the twenty-first. Security messages
+     * ignore preferences entirely — see `preferences.service.js` — and the skip is recorded in
+     * the delivery ledger rather than dropped silently, so "why did they not get it" has an
+     * answer.
+     */
+    if (!(await mayNotify(userId, key, channel))) {
+      return recordDelivery({
+        key, channel, to, userId, subject, variables,
+        outcome: { status: 'skipped', error: 'The recipient has turned this off.' },
+      })
+    }
 
     /**
      * The stored template, or the built-in default when nobody has opened the templates page
@@ -353,3 +527,25 @@ export async function listDeliveries({ page = 1, pageSize = 50, status, channel,
 }
 
 export { messagingCapabilities }
+
+/**
+ * Send without waiting for the mail server.
+ *
+ * `send()` returns the delivery outcome, which is genuinely useful in one place — deciding
+ * whether to tell someone "check your inbox" — and useless everywhere else. Everywhere else was
+ * nevertheless awaiting it, which put a live SMTP round trip inside a user's request: measured
+ * at three to fourteen seconds against Gmail. Approving a seller application appeared to hang
+ * because of it, even though the store had already been created.
+ *
+ * Nothing here is lost by not waiting. `send()` never throws, and it records every attempt and
+ * its outcome in `message_deliveries` — which is where a real delivery failure is investigated,
+ * not in the response to whoever happened to trigger it.
+ *
+ * The one caller that should keep awaiting is the admin "send test message" action, whose
+ * entire purpose is to report what happened.
+ */
+export function sendInBackground(key, options) {
+  send(key, options).catch(() => {
+    // Unreachable in practice — send() swallows its own failures — and harmless if it ever is.
+  })
+}

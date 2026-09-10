@@ -30,8 +30,10 @@ export async function marketplaceAnalytics({ range, from, to }) {
 
   const totals = await queryOne(
     `SELECT COUNT(*)                                        AS orders,
-            COALESCE(SUM(o.total), 0)                       AS gmv,
+            COALESCE(SUM(o.subtotal - o.discount_total), 0)  AS gmv,
             COALESCE(SUM(o.subtotal), 0)                    AS goods,
+            COALESCE(SUM(o.discount_total), 0)              AS discounts,
+            COALESCE(SUM(o.tax_total), 0)                   AS tax,
             COALESCE(SUM(o.shipping_fee), 0)                AS shipping,
             COUNT(DISTINCT o.buyer_id)                      AS buyers
        FROM orders o WHERE ${COMPLETED} ${current.sql}`,
@@ -44,14 +46,14 @@ export async function marketplaceAnalytics({ range, from, to }) {
   )
   const priorTotals = prevStart
     ? await queryOne(
-      `SELECT COUNT(*) AS orders, COALESCE(SUM(o.total), 0) AS gmv
+      `SELECT COUNT(*) AS orders, COALESCE(SUM(o.subtotal - o.discount_total), 0) AS gmv
          FROM orders o WHERE ${COMPLETED} ${previous.sql}`,
       previous.params,
     )
     : null
 
   const daily = await query(
-    `SELECT DATE(o.created_at) AS day, COUNT(*) AS orders, COALESCE(SUM(o.total), 0) AS gmv
+    `SELECT DATE(o.created_at) AS day, COUNT(*) AS orders, COALESCE(SUM(o.subtotal - o.discount_total), 0) AS gmv
        FROM orders o WHERE ${COMPLETED} ${current.sql}
       GROUP BY day ORDER BY day`,
     current.params,
@@ -59,7 +61,7 @@ export async function marketplaceAnalytics({ range, from, to }) {
 
   const byCategory = await query(
     `SELECT c.name, COUNT(DISTINCT oi.order_id) AS orders,
-            COALESCE(SUM(oi.line_total), 0) AS revenue, COALESCE(SUM(oi.quantity), 0) AS units
+            COALESCE(SUM(oi.line_total - oi.discount_amount), 0) AS revenue, COALESCE(SUM(oi.quantity), 0) AS units
        FROM order_items oi
        JOIN orders o    ON o.id = oi.order_id
        JOIN products p  ON p.id = oi.product_id
@@ -126,7 +128,7 @@ export async function sellerAnalytics({ range, from, to }) {
   const rows = await query(
     `SELECT s.public_id, s.store_name, s.status,
             COUNT(DISTINCT oi.order_id)          AS orders,
-            COALESCE(SUM(oi.line_total), 0)      AS revenue,
+            COALESCE(SUM(oi.line_total - oi.discount_amount), 0)      AS revenue,
             COALESCE(SUM(oi.quantity), 0)        AS units,
             SUM(oi.status = 'cancelled')         AS cancelled_items,
             SUM(oi.status = 'delivered')         AS delivered_items,
@@ -523,7 +525,7 @@ export async function sellerActivity(sellerPublicId, { limit = 20 } = {}) {
     `SELECT o.public_id, o.order_number, o.status, o.created_at, o.currency_code,
             buyer.full_name AS buyer_name,
             COUNT(oi.id)                    AS items,
-            COALESCE(SUM(oi.line_total), 0) AS seller_value
+            COALESCE(SUM(oi.line_total - oi.discount_amount), 0) AS seller_value
        FROM order_items oi
        JOIN orders o    ON o.id = oi.order_id
        JOIN users buyer ON buyer.id = o.buyer_id
@@ -548,7 +550,7 @@ export async function sellerActivity(sellerPublicId, { limit = 20 } = {}) {
 
   const totals = await queryOne(
     `SELECT COUNT(DISTINCT oi.order_id)     AS orders,
-            COALESCE(SUM(oi.line_total), 0) AS revenue,
+            COALESCE(SUM(oi.line_total - oi.discount_amount), 0) AS revenue,
             COALESCE(SUM(oi.quantity), 0)   AS units
        FROM order_items oi
        JOIN orders o ON o.id = oi.order_id AND ${COMPLETED}

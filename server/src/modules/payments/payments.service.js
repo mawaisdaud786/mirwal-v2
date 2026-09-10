@@ -6,6 +6,7 @@ import { createNotification } from '../notifications/notifications.service.js'
 import * as stripeProvider from './providers/stripe.js'
 import * as easypaisaProvider from './providers/easypaisa.js'
 import * as jazzcashProvider from './providers/jazzcash.js'
+import { issueForOrder } from '../orders/invoices.service.js'
 
 /**
  * Payment orchestration.
@@ -193,6 +194,20 @@ export async function settleAttempt(provider, result) {
       link: `/order-success/${order.public_id}`,
     }, connection)
   })
+
+  /**
+   * Issue the tax invoice.
+   *
+   * After the transaction, not inside it: the invoice number is taken under its own row lock,
+   * and holding that lock inside the payment transaction would serialise every checkout behind
+   * one counter. Failure is swallowed because the payment has already succeeded — a buyer whose
+   * money was taken must not see an error, and the invoice is issued on first request anyway.
+   */
+  try {
+    await issueForOrder(order.id)
+  } catch (error) {
+    console.error('[payments] invoice could not be issued', { orderId: order.id, error: error.message })
+  }
 
   return { applied: true, succeeded: true }
 }

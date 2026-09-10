@@ -4,6 +4,8 @@ import { hashPassword, needsRehash, verifyPassword } from '../../lib/password.js
 import { createRefreshToken, hashRefreshToken, refreshExpiry, signAccessToken, toSqlDateTime } from '../../lib/tokens.js'
 import { conflict, forbidden, unauthorized } from '../../lib/errors.js'
 import { verifySecondFactor } from '../admin/security.service.js'
+import * as messaging from '../messaging/messaging.service.js'
+import { parseJsonColumn } from '../../lib/json.js'
 
 /** Exported so the admin Security page states the lockout policy actually in force. */
 export const MAX_FAILED_LOGINS = 8
@@ -31,6 +33,17 @@ const publicUser = (user, authorization) => ({
   email: user.email,
   fullName: user.full_name,
   phone: user.phone,
+  city: user.city,
+  country: user.country,
+  language: user.preferred_language,
+  address: user.default_address,
+  paymentMethod: user.default_payment_method,
+  // `parseJsonColumn`, not `JSON.parse`. mysql2 hands JSON columns back already parsed on some
+  // paths and as a string on others, and a raw parse on an object throws — which happened here
+  // the moment anything started writing these columns: it is on the login path, so the failure
+  // is not a missing preference but an account that can no longer sign in.
+  notificationChannels: parseJsonColumn(user.notification_channels, {}),
+  notificationPreferences: parseJsonColumn(user.notification_preferences, {}),
   status: user.status,
   emailVerified: Boolean(user.email_verified_at),
   roles: authorization.roles,
@@ -167,11 +180,66 @@ export async function issueTokens(user, authorization, context = {}) {
   const { token, hash } = createRefreshToken()
   const expires = refreshExpiry()
 
+  const userAgent = (context.userAgent ?? '').slice(0, 255)
+
+  /**
+   * Has this account been seen on this device before?
+   *
+   * Asked *before* the new row is inserted, or the session being created would match itself.
+   *
+   * Matching on the user agent alone is coarse — it does not distinguish two Chrome installs
+   * on the same version, and it produces a false alert whenever a browser updates. That is the
+   * right trade in this direction: a spurious "was this you?" costs a moment's attention, and
+   * a missed one costs the account. A real device fingerprint would be better and is a much
+   * larger change; this is the signal available from data already being stored.
+   *
+   * Deliberately not gated on IP. Pakistani mobile carriers rotate addresses constantly, so an
+   * IP-based check would alert on almost every sign-in and be ignored within a week.
+   */
+  const [[seen]] = await pool.execute(
+    `SELECT COUNT(*) AS n FROM refresh_tokens
+      WHERE user_id = ? AND user_agent = ? AND user_agent <> ''`,
+    [user.id, userAgent],
+  )
+  const isNewDevice = Number(seen.n) === 0
+
   await pool.execute(
     `INSERT INTO refresh_tokens (user_id, token_hash, expires_at, user_agent, ip_address)
      VALUES (?, ?, ?, ?, ?)`,
-    [user.id, hash, toSqlDateTime(expires), (context.userAgent ?? '').slice(0, 255), context.ip ?? null],
+    [user.id, hash, toSqlDateTime(expires), userAgent, context.ip ?? null],
   )
+
+  /**
+   * Tell them.
+   *
+   * An account takeover is silent by design: the attacker changes nothing the owner would
+   * notice until the money moves. This message is frequently the only thing that reaches the
+   * real owner while it still matters.
+   *
+   * Skipped for an account's very first session — everyone's first sign-in is from a device
+   * they have never used before, and alerting on it teaches people to ignore the alert.
+   *
+   * Not awaited: `send()` never throws, but it does talk to an SMTP server, and a sign-in must
+   * not wait on that. A dropped alert is a worse outcome than a slow one only if it is common,
+   * and the delivery ledger records every attempt either way.
+   */
+  if (isNewDevice && userAgent) {
+    const [[priorSessions]] = await pool.execute(
+      'SELECT COUNT(*) AS n FROM refresh_tokens WHERE user_id = ?',
+      [user.id],
+    )
+    if (Number(priorSessions.n) > 1) {
+      messaging.send('security.new_device_login', {
+        to: user.email,
+        userId: user.id,
+        variables: {
+          name: user.full_name ?? '',
+          device: userAgent,
+          when: new Date().toUTCString(),
+        },
+      }).catch(() => {})
+    }
+  }
 
   return { accessToken, refreshToken: token, refreshExpires: expires }
 }
@@ -246,10 +314,12 @@ export async function getCurrentUser(userId) {
  * not editable here at all, so a crafted body cannot escalate anything. The user id comes
  * from the verified token, never from the request.
  */
-export async function updateProfile(userId, { fullName, phone }) {
+export async function updateProfile(userId, { fullName, phone, city, country, language, address, paymentMethod, notificationChannels, notificationPreferences }) {
   await pool.execute(
-    'UPDATE users SET full_name = ?, phone = ? WHERE id = ? AND deleted_at IS NULL',
-    [fullName, phone || null, userId],
+    `UPDATE users
+        SET full_name = ?, phone = ?, city = ?, country = ?, preferred_language = ?, default_address = ?, default_payment_method = COALESCE(?, default_payment_method), notification_channels = COALESCE(?, notification_channels), notification_preferences = COALESCE(?, notification_preferences)
+      WHERE id = ? AND deleted_at IS NULL`,
+    [fullName, phone || null, city || null, country || null, language || null, address || null, paymentMethod || null, notificationChannels ? JSON.stringify(notificationChannels) : null, notificationPreferences ? JSON.stringify(notificationPreferences) : null, userId],
   )
   return getCurrentUser(userId)
 }

@@ -32,8 +32,11 @@ export const listProductsSchema = z.object({
   status: z.enum(PRODUCT_STATUSES).optional(),
   search: z.string().trim().max(120).optional(),
   categoryId: z.coerce.number().int().positive().optional(),
+  brandId: z.coerce.number().int().positive().optional(),
   sellerId: z.coerce.number().int().positive().optional(),
-  sort: z.enum(['newest', 'oldest', 'name', 'price-high', 'price-low']).default('newest'),
+  // `risk` exists because a two-hundred-item queue sorted by arrival gives a reviewer no way
+  // to tell which listing is worth opening first.
+  sort: z.enum(['newest', 'oldest', 'name', 'price-high', 'price-low', 'risk']).default('newest'),
 })
 
 export const createProductSchema = z.object({

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { DOC_TYPES as SELLER_DOC_TYPES } from '../sellers/documents.service.js'
 
 const publicId = z.string().trim().uuid()
 
@@ -47,9 +48,14 @@ export const sendTestSchema = z.object({
 
 // --- Seller documents --------------------------------------------------------
 
-export const DOC_TYPES = [
-  'cnic_front', 'cnic_back', 'business_registration', 'tax_certificate', 'bank_statement', 'other',
-]
+/**
+ * Derived from the seller-facing list rather than repeated here.
+ *
+ * These were two hand-maintained arrays and they had already drifted: migration 020 added
+ * three document types that this copy never learned about, so the API refused uploads the
+ * database was perfectly willing to store.
+ */
+export const DOC_TYPES = SELLER_DOC_TYPES.map((entry) => entry.type)
 
 export const listDocumentsSchema = z.object({
   ...pageQuery,

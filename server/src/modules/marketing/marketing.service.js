@@ -71,7 +71,7 @@ function shapeCoupon(row) {
     endsAt: row.ends_at,
     status: row.status,
     effectiveStatus: effectiveStatus(row),
-    owner: row.seller_slug ? { slug: row.seller_slug, name: row.seller_store_name } : null,
+    owner: row.seller_slug ? { id: row.seller_public_id, slug: row.seller_slug, name: row.seller_store_name } : null,
     createdAt: row.created_at,
   }
 }
@@ -82,7 +82,7 @@ const COUPON_SELECT = `
          c.max_discount_amount, c.min_order_amount,
          c.usage_limit, c.usage_limit_per_user, c.usage_count,
          c.starts_at, c.ends_at, c.status, c.created_at,
-         s.slug AS seller_slug, s.store_name AS seller_store_name,
+         s.public_id AS seller_public_id, s.slug AS seller_slug, s.store_name AS seller_store_name,
          (SELECT COUNT(*) FROM coupon_redemptions r WHERE r.coupon_id = c.id) AS redemption_count
     FROM coupons c
     LEFT JOIN sellers s ON s.id = c.seller_id`
@@ -259,7 +259,7 @@ function shapePromotion(row) {
     bannerImageUrl: row.banner_image_url,
     priority: Number(row.priority),
     productCount: row.product_count == null ? 0 : Number(row.product_count),
-    owner: row.seller_slug ? { slug: row.seller_slug, name: row.seller_store_name } : null,
+    owner: row.seller_slug ? { id: row.seller_public_id, slug: row.seller_slug, name: row.seller_store_name } : null,
     createdAt: row.created_at,
   }
 }
@@ -268,7 +268,7 @@ const PROMOTION_SELECT = `
   SELECT p.id, p.public_id, p.kind, p.slug, p.name, p.description, p.seller_id,
          p.discount_type, p.discount_bps, p.discount_amount, p.currency_code,
          p.starts_at, p.ends_at, p.status, p.banner_image_url, p.priority, p.created_at,
-         s.slug AS seller_slug, s.store_name AS seller_store_name,
+         s.public_id AS seller_public_id, s.slug AS seller_slug, s.store_name AS seller_store_name,
          (SELECT COUNT(*) FROM promotion_products pp WHERE pp.promotion_id = p.id) AS product_count
     FROM promotions p
     LEFT JOIN sellers s ON s.id = p.seller_id`

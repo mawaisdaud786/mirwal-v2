@@ -1,6 +1,7 @@
 import { ok, okPage } from '../../lib/errors.js'
 import * as ops from './operations.service.js'
 import { AUDIT, recordAudit } from './audit.service.js'
+import { getWorkQueue } from './workqueue.service.js'
 
 /**
  * Admin operations endpoints.
@@ -184,4 +185,15 @@ export async function deleteAttribute(req, res, next) {
     await recordAudit(req, { action: AUDIT.ATTRIBUTE_DELETED, entityType: 'attribute', entityId: req.params.slug, metadata: { name: result.name } })
     return ok(res, null, 'Attribute deleted.')
   } catch (error) { return next(error) }
+}
+
+/**
+ * The operations board.
+ *
+ * Scoped to what this operator can act on, using the permissions already resolved onto the
+ * request — nothing here takes a role from the client.
+ */
+export async function workQueue(req, res, next) {
+  try { return ok(res, await getWorkQueue(req.user.permissions)) }
+  catch (error) { return next(error) }
 }

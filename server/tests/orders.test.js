@@ -125,7 +125,7 @@ test('checkout creates a real order, prices it server-side, decrements inventory
 
   // A different seller cannot see or modify this order item.
   const otherSellersList = await apiFetch(server.baseUrl, '/seller/me/orders', { token: sellerBToken })
-  assert.ok(!otherSellersList.body.data.some((item) => item.id === orderItemId))
+  assert.ok(!otherSellersList.body.data.items.some((item) => item.id === orderItemId))
   const otherSellersPatch = await apiFetch(server.baseUrl, `/seller/me/orders/${orderItemId}/status`, {
     method: 'PATCH', token: sellerBToken, body: { status: 'processing' },
   })

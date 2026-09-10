@@ -42,7 +42,13 @@ export const orderIdSchema = z.object({
 })
 
 export const updateOrderItemStatusSchema = z.object({
-  status: z.enum(['confirmed', 'processing', 'shipped', 'delivered', 'cancelled']),
+  // `failed_delivery` is a real outcome, not a synonym for cancelled: the seller shipped and
+  // the courier could not hand the parcel over. Recording it as a cancellation scores a seller
+  // for something the buyer did.
+  status: z.enum(['confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'failed_delivery', 'returned']),
+  // Required by the service when cancelling, so a seller-side cancellation is always
+  // explainable to the buyer it disappoints.
+  reason: z.string().trim().max(255).optional().nullable(),
 })
 
 export const orderItemIdSchema = z.object({
@@ -61,4 +67,34 @@ export const resolveReturnRequestSchema = z.object({
 
 export const returnRequestIdSchema = z.object({
   id: z.string().trim().min(1).max(36),
+})
+
+/**
+ * Filters for the admin order list.
+ *
+ * `status` is the rolled-up item status the list actually shows, not `orders.status`: an
+ * operator filtering for "shipped" means "something has left a warehouse", which is a fact
+ * about the items.
+ */
+export const listOrdersAdminSchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).optional().default(25),
+  search: z.string().trim().max(120).optional().default(''),
+  // No `.default('')` on these: an empty string is not a member of the enum, so the default
+  // would fail its own validation the moment the filter was left off.
+  status: z.enum(['processing', 'shipped', 'delivered', 'cancelled']).optional(),
+  paymentStatus: z.enum(['pending', 'processing', 'paid', 'failed', 'partially_refunded', 'refunded']).optional(),
+})
+
+/**
+ * Filters for a seller's own order lines.
+ *
+ * `processing` is a group rather than a status: pending, confirmed and processing all mean
+ * "not dispatched yet", which is the only distinction that matters when packing.
+ */
+export const listSellerOrdersSchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).optional().default(25),
+  status: z.enum(['processing', 'shipped', 'delivered', 'cancelled', 'failed_delivery', 'returned']).optional(),
+  search: z.string().trim().max(120).optional(),
 })

@@ -187,7 +187,7 @@ export async function addAccount(sellerId, input, { userId, storeName } = {}) {
       link: '/finance/settings',
     })
     const owner = await queryOne('SELECT email, full_name FROM users WHERE id = ?', [userId])
-    await messaging.send('security.bank_account_changed', {
+    messaging.sendInBackground('security.bank_account_changed', {
       to: owner?.email,
       userId,
       variables: {

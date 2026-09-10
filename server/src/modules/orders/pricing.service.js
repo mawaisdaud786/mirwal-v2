@@ -23,7 +23,7 @@ import { getNumericSetting, getSetting } from '../settings/settings.service.js'
  * which is the fastest way to lose a seller's trust permanently.
  */
 
-const round2 = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100
+export const round2 = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100
 
 /**
  * Split `total` across `weights` so the parts sum to exactly `total`.
@@ -141,7 +141,7 @@ function priceMethod(method, subtotal) {
  * Returns null when no code was supplied. Throws when a code was supplied and is not usable:
  * a shopper who typed a code and saw it silently ignored will call support.
  */
-export async function resolveCoupon(connection, { code, buyerId, lines, subtotal }) {
+export async function resolveCoupon(connection, { code, buyerId, lines }) {
   if (!code) return null
 
   const [rows] = await connection.execute(
@@ -290,4 +290,3 @@ function safeJson(column, fallback) {
   try { return JSON.parse(column) } catch { return fallback }
 }
 
-export { round2 }

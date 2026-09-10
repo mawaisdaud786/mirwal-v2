@@ -26,6 +26,14 @@ const bool = (name, fallback) => (process.env[name] ?? String(fallback)).toLower
 export const env = {
   nodeEnv: optional('NODE_ENV', 'development'),
   get isProduction() { return this.nodeEnv === 'production' },
+  /**
+   * True while the integration suite is running.
+   *
+   * Used only to relax the global rate limiter (see app.js). Nothing else branches on it —
+   * a test environment that behaves differently from production is a test environment that
+   * proves less than it appears to.
+   */
+  get isTest() { return this.nodeEnv === 'test' || process.env.MIRWAL_TEST === '1' },
 
   port: int('PORT', 4000),
   apiPrefix: optional('API_PREFIX', '/api/v1'),
@@ -143,6 +151,17 @@ export const env = {
     apiUrl: optional('SMS_API_URL', ''),
     apiKey: process.env.SMS_API_KEY || '',
     sender: optional('SMS_SENDER', 'Mirwal'),
+    // How the gateway wants the request. See lib/media.js's sibling note in mailer.js: the
+    // local providers do not agree, and this keeps switching between them a config change.
+    style: optional('SMS_API_STYLE', 'json'),
+    // What the gateway calls each field. Defaults suit a modern JSON API; the older reseller
+    // panels typically want mobile/message/mask/key.
+    params: {
+      to: optional('SMS_PARAM_TO', 'to'),
+      message: optional('SMS_PARAM_MESSAGE', 'message'),
+      from: optional('SMS_PARAM_FROM', 'from'),
+      key: optional('SMS_PARAM_KEY', 'key'),
+    },
     get enabled() { return Boolean(this.apiUrl && this.apiKey) },
   },
 
@@ -151,6 +170,14 @@ export const env = {
     // nothing here is ever served statically.
     dir: optional('UPLOAD_DIR', './storage/uploads'),
     maxBytes: int('UPLOAD_MAX_BYTES', 5 * 1024 * 1024),
+  },
+
+  media: {
+    // Public images: product photos, store logos and banners. Served statically, which is
+    // exactly why it is a different directory from `uploads` — see lib/media.js. A single
+    // shared root would mean one misconfigured static handler exposes CNICs.
+    dir: optional('MEDIA_DIR', './storage/media'),
+    maxBytes: int('MEDIA_MAX_BYTES', 5 * 1024 * 1024),
   },
 
   backups: {

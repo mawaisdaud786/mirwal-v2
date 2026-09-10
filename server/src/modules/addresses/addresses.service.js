@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { query, queryOne, withTransaction } from '../../db/pool.js'
-import { forbidden, notFound } from '../../lib/errors.js'
+import { conflict, forbidden, notFound } from '../../lib/errors.js'
 
 /**
  * A buyer's saved address book. Entirely separate from `orders.shipping_*` (migration 003),
@@ -39,6 +39,14 @@ export async function listAddresses(userId) {
 export async function createAddress(userId, input) {
   const publicId = randomUUID()
   await withTransaction(async (connection) => {
+    const [duplicate] = await connection.execute(
+      `SELECT id FROM addresses
+        WHERE user_id = ? AND deleted_at IS NULL AND LOWER(TRIM(full_name)) = LOWER(TRIM(?))
+          AND phone = ? AND LOWER(TRIM(line1)) = LOWER(TRIM(?)) AND LOWER(TRIM(city)) = LOWER(TRIM(?))
+          AND LOWER(TRIM(region)) = LOWER(TRIM(?)) AND postal_code = ? LIMIT 1`,
+      [userId, input.fullName, input.phone, input.line1, input.city, input.region ?? '', input.postalCode ?? ''],
+    )
+    if (duplicate.length) throw conflict('This address is already saved.', 'ADDRESS_EXISTS')
     if (input.isDefault) {
       await connection.execute('UPDATE addresses SET is_default = 0 WHERE user_id = ?', [userId])
     }
@@ -68,13 +76,22 @@ async function findOwned(userId, publicId) {
 export async function updateAddress(userId, publicId, input) {
   const existing = await findOwned(userId, publicId)
   await withTransaction(async (connection) => {
+    const [duplicate] = await connection.execute(
+      `SELECT id FROM addresses
+        WHERE user_id = ? AND deleted_at IS NULL AND id <> ? AND LOWER(TRIM(full_name)) = LOWER(TRIM(?))
+          AND phone = ? AND LOWER(TRIM(line1)) = LOWER(TRIM(?)) AND LOWER(TRIM(city)) = LOWER(TRIM(?))
+          AND LOWER(TRIM(region)) = LOWER(TRIM(?)) AND postal_code = ? LIMIT 1`,
+      [userId, existing.id, input.fullName, input.phone, input.line1, input.city, input.region ?? '', input.postalCode ?? ''],
+    )
+    if (duplicate.length) throw conflict('This address is already saved.', 'ADDRESS_EXISTS')
     if (input.isDefault) {
       await connection.execute('UPDATE addresses SET is_default = 0 WHERE user_id = ?', [userId])
     }
+    const keepDefault = Boolean(input.isDefault || existing.is_default)
     await connection.execute(
       `UPDATE addresses SET full_name = ?, phone = ?, line1 = ?, line2 = ?, city = ?, region = ?, postal_code = ?, is_default = ?
         WHERE id = ?`,
-      [input.fullName, input.phone, input.line1, input.line2 ?? '', input.city, input.region ?? '', input.postalCode ?? '', input.isDefault ? 1 : 0, existing.id],
+      [input.fullName, input.phone, input.line1, input.line2 ?? '', input.city, input.region ?? '', input.postalCode ?? '', keepDefault ? 1 : 0, existing.id],
     )
   })
   return shapeAddress(await queryOne('SELECT * FROM addresses WHERE public_id = ?', [publicId]))

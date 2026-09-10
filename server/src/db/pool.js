@@ -88,6 +88,40 @@ export async function withTransaction(fn) {
   }
 }
 
+/**
+ * Read several aggregates as one consistent snapshot.
+ *
+ * A dashboard that runs eleven aggregate queries in parallel gets eleven pooled connections
+ * and therefore eleven slightly different moments in time. Under any real write traffic the
+ * headline figure and the chart beside it then disagree — the KPI counts an order the trend
+ * does not, and nothing about the page says which is right.
+ *
+ * `START TRANSACTION WITH CONSISTENT SNAPSHOT` in REPEATABLE READ gives every query in `fn`
+ * the same view of the database. It costs the parallelism — one connection, so the reads are
+ * serial — which is the right trade for a page whose whole job is that its numbers add up.
+ * READ ONLY lets InnoDB skip allocating a transaction id.
+ *
+ * `fn` is handed a `read(sql, params)` that runs on that connection. Anything using the pool
+ * directly inside `fn` is outside the snapshot, so pass everything through it.
+ */
+export async function withSnapshot(fn) {
+  const connection = await pool.getConnection()
+  try {
+    await connection.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY')
+    await connection.query('START TRANSACTION WITH CONSISTENT SNAPSHOT')
+    const read = async (sql, params = []) => {
+      const [rows] = await connection.execute(sql, params)
+      return rows
+    }
+    return await fn(read)
+  } finally {
+    // Nothing was written, so the outcome of ending it does not matter — but the connection
+    // must not go back to the pool still inside a transaction.
+    try { await connection.query('COMMIT') } catch { /* connection already gone */ }
+    connection.release()
+  }
+}
+
 /** Verify connectivity and that the session really is utf8mb4. Called on boot. */
 export async function verifyConnection() {
   const row = await queryOne(

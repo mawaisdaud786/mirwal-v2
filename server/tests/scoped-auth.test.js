@@ -69,7 +69,8 @@ test('an admin authenticates through the admin namespace and the token works on 
 
   const orders = await apiFetch(server.baseUrl, '/admin/orders', { token: body.data.accessToken })
   assert.equal(orders.status, 200)
-  assert.ok(Array.isArray(orders.data ?? orders.body.data))
+  // A page envelope now that the endpoint pages server-side, not a bare array.
+  assert.ok(Array.isArray(orders.body.data.items))
 })
 
 test('the admin refresh cookie is a distinct, httpOnly, path-scoped cookie', async () => {
@@ -145,7 +146,8 @@ test("a seller cannot act on another seller's order item by guessing its id", as
     token: sellerA.body.data.accessToken,
   })
   assert.equal(ownItems.status, 200)
-  const victimItemId = ownItems.body.data[0]?.id
+  // A page envelope now that the endpoint pages server-side, not a bare array.
+  const victimItemId = ownItems.body.data.items[0]?.id
   assert.ok(victimItemId, 'seed data should give Seller A at least one order item')
 
   const sellerB = await login('seller', SELLER_B)

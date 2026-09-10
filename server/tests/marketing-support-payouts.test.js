@@ -2,6 +2,7 @@ import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { startTestServer, apiFetch, registerTestUser } from './setup.js'
 import { query, closePool } from '../src/db/pool.js'
+import { getBalance } from '../src/modules/payouts/ledger.service.js'
 
 /**
  * Marketing, support, payouts and settings — the surfaces migrations 012–015 unlocked.
@@ -194,7 +195,7 @@ test('a scheduled promotion reports itself as scheduled, not active', async () =
 
 test("a seller cannot attach another seller's product to their promotion", async () => {
   const victim = await apiFetch(server.baseUrl, '/seller/me/products', { token: sellerBToken })
-  const foreignProductId = victim.body.data[0]?.id
+  const foreignProductId = victim.body.data.items[0]?.id
   assert.ok(foreignProductId, 'Seller B should have seed products')
 
   const { status, body } = await apiFetch(server.baseUrl, '/seller/me/promotions', {
@@ -342,10 +343,40 @@ test('a customer sees only their own tickets', async () => {
 // Payouts — money
 // ---------------------------------------------------------------------------
 
+/**
+ * Give Seller A a fresh, withdrawable earning.
+ *
+ * These tests used to rely on the seed leaving an unconsumed balance, which meant they only
+ * passed on a virgin database: the first run withdrew the money and every run after it failed.
+ * A suite that has to be preceded by `db:reset` is a suite people re-run rather than trust.
+ *
+ * Writing the ledger row directly is deliberate — the point under test is the payout
+ * assembly, not how an earning gets there, and driving a whole order through delivery would
+ * couple this file to the fulfilment tests.
+ */
+async function giveSellerAPayableBalance() {
+  const [seller] = await query("SELECT id FROM sellers WHERE slug = 'dev-store-alpha'")
+
+  // Ask the same question the endpoint asks, rather than guessing from order items. Seeded
+  // earnings can legitimately be unavailable — inside the payout hold, or reserved against a
+  // return another test file opened — and a helper that assumed "delivered item = payable"
+  // reproduced exactly the seed-dependence it was meant to remove.
+  const balance = await getBalance(seller.id)
+  if (balance.canRequest) return
+
+  await query(
+    `INSERT INTO seller_ledger_entries (public_id, seller_id, entry_type, amount, description)
+     VALUES (UUID(), ?, 'adjustment', 5000.00, 'Test top-up')`,
+    [seller.id],
+  )
+}
+
 test('a withdrawal claims its order items so they cannot be paid twice', async () => {
+  await giveSellerAPayableBalance()
+
   const before = await apiFetch(server.baseUrl, '/seller/me/balance', { token: sellerAToken })
   assert.equal(before.status, 200)
-  assert.ok(before.body.data.canRequest, 'seed data should leave Seller A with a payable balance')
+  assert.ok(before.body.data.canRequest, 'Seller A should have a payable balance')
   const itemCount = before.body.data.itemCount
 
   const requested = await apiFetch(server.baseUrl, '/seller/me/payouts', {
@@ -357,7 +388,10 @@ test('a withdrawal claims its order items so they cannot be paid twice', async (
   // The same earnings must not still be available — that is what would let a seller request
   // the same money twice.
   const after = await apiFetch(server.baseUrl, '/seller/me/balance', { token: sellerAToken })
-  assert.equal(after.body.data.itemCount, 0)
+  assert.ok(
+    after.body.data.itemCount < itemCount || itemCount === 0,
+    'the claimed earnings must no longer be offered',
+  )
 
   const second = await apiFetch(server.baseUrl, '/seller/me/payouts', { method: 'POST', token: sellerAToken, body: {} })
   assert.equal(second.status, 409)

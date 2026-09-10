@@ -39,10 +39,20 @@ test('admin disputes reflects real return_requests and is internally consistent'
   ])
   assert.equal(status, 200)
   assert.equal(body.data.disputes.length, Math.min(Number(realCount.n), 200))
+  // The buckets have to cover the whole lifecycle. They once counted three states out of ten,
+  // so the summary quietly disagreed with the list printed beside it.
+  const { summary } = body.data
+  const terminal = summary.settled + summary.rejected + summary.cancelled
   assert.equal(
-    body.data.summary.pending + body.data.summary.approved + body.data.summary.rejected,
+    summary.open + terminal,
     body.data.disputes.length,
-    'every dispute must fall into exactly one status bucket',
+    'every return must be either open or finished — no status may fall through the buckets',
+  )
+  assert.equal(
+    summary.awaitingSeller + summary.awaitingBuyer + summary.inTransit + summary.escalated
+      + body.data.disputes.filter((d) => d.status === 'approved').length,
+    summary.open,
+    'the open buckets must add up to the open total',
   )
   for (const dispute of body.data.disputes) {
     assert.ok(dispute.buyerName && dispute.sellerName, 'every dispute must resolve to a real buyer and seller')

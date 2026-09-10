@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { query, queryOne, pool } from '../../db/pool.js'
 import { notFound, badRequest, conflict } from '../../lib/errors.js'
+import { recomputeProductRating, recomputeSellerRating } from './moderation.service.js'
 
 /**
  * Product reviews — verified purchase only.
@@ -19,22 +20,14 @@ import { notFound, badRequest, conflict } from '../../lib/errors.js'
  */
 
 /**
- * Recomputes a product's cached rating from its real reviews.
+ * The cached rating is recomputed by `moderation.service.js`, not here.
  *
- * The aggregate is cached on `products` (rather than computed per query) because every
- * product card, sort and filter reads it — but it is only ever written from here, so the
- * cache can never drift away from the reviews that justify it. A product whose last review
- * is deleted correctly falls back to 0/0 rather than keeping a stale average.
+ * There used to be a copy of that arithmetic in this file, counting every review row. Once a
+ * review could be hidden or removed (migration 023) the two definitions disagreed: this one
+ * would have kept a hidden review inside the average, so a product could display 4.8 from
+ * reviews a shopper cannot find — which is precisely the manipulation moderation exists to
+ * undo. One definition, imported.
  */
-async function recomputeProductRating(productId) {
-  await pool.execute(
-    `UPDATE products p
-        SET p.rating_average = COALESCE((SELECT ROUND(AVG(r.rating), 2) FROM product_reviews r WHERE r.product_id = p.id), 0),
-            p.rating_count   = (SELECT COUNT(*) FROM product_reviews r WHERE r.product_id = p.id)
-      WHERE p.id = ?`,
-    [productId],
-  )
-}
 
 function shapeReview(row) {
   return {
@@ -60,14 +53,33 @@ export async function listForProduct(slug) {
   )
   if (!product) throw notFound('Product not found.', 'PRODUCT_NOT_FOUND')
 
+  /**
+   * Published reviews only.
+   *
+   * Since migration 023 a review can be hidden or removed by a moderator. Every read path has
+   * to filter on that, including the histogram — a breakdown that counts a review a shopper
+   * cannot find makes the rating unexplainable, and is exactly the manipulation moderation
+   * exists to undo.
+   */
   const [rows, breakdown] = await Promise.all([
     query(
-      `SELECT r.public_id, r.rating, r.title, r.body, r.created_at, u.full_name
-         FROM product_reviews r JOIN users u ON u.id = r.user_id
-        WHERE r.product_id = ? ORDER BY r.created_at DESC LIMIT 50`,
+      `SELECT r.public_id, r.rating, r.title, r.body, r.created_at, r.helpful_count,
+              u.full_name,
+              resp.body AS response_body, resp.created_at AS response_at,
+              s.store_name AS response_store
+         FROM product_reviews r
+         JOIN users u ON u.id = r.user_id
+         LEFT JOIN review_responses resp
+                ON resp.review_id = r.id AND resp.status = 'published'
+         LEFT JOIN sellers s ON s.id = resp.seller_id
+        WHERE r.product_id = ? AND r.status = 'published'
+        ORDER BY r.helpful_count DESC, r.created_at DESC LIMIT 50`,
       [product.id],
     ),
-    query('SELECT rating, COUNT(*) AS count FROM product_reviews WHERE product_id = ? GROUP BY rating', [product.id]),
+    query(
+      "SELECT rating, COUNT(*) AS count FROM product_reviews WHERE product_id = ? AND status = 'published' GROUP BY rating",
+      [product.id],
+    ),
   ])
 
   // Always all five buckets, so a histogram renders without the client inventing the zeroes.
@@ -75,7 +87,14 @@ export async function listForProduct(slug) {
   for (const row of breakdown) counts[row.rating] = Number(row.count)
 
   return {
-    reviews: rows.map(shapeReview),
+    reviews: rows.map((row) => ({
+      ...shapeReview(row),
+      helpfulCount: Number(row.helpful_count ?? 0),
+      // The seller's public answer, shown under the review it replies to.
+      sellerResponse: row.response_body
+        ? { body: row.response_body, storeName: row.response_store, at: row.response_at }
+        : null,
+    })),
     summary: {
       average: Number(product.rating_average),
       count: Number(product.rating_count),
@@ -106,11 +125,11 @@ export async function listReviewable(userId) {
   }))
 }
 
-export async function createReview(userId, { orderItemId, rating, title, body }) {
+export async function createReview(userId, { orderItemId, rating, title, body }, { ip = null } = {}) {
   // Scoped to this buyer's own order: an order_item id belonging to anyone else simply is
   // not found, so there is no way to review a product someone else bought.
   const item = await queryOne(
-    `SELECT oi.id, oi.product_id, oi.status
+    `SELECT oi.id, oi.product_id, oi.status, oi.seller_id
        FROM order_items oi JOIN orders o ON o.id = oi.order_id
       WHERE oi.id = ? AND o.buyer_id = ?`,
     [orderItemId, userId],
@@ -123,11 +142,21 @@ export async function createReview(userId, { orderItemId, rating, title, body })
   const existing = await queryOne('SELECT id FROM product_reviews WHERE order_item_id = ?', [item.id])
   if (existing) throw conflict('You have already reviewed this item.', 'ALREADY_REVIEWED')
 
+  /**
+   * `submitted_ip` is captured here and nowhere else.
+   *
+   * Several accounts reviewing one store from a single address is the clearest self-review
+   * signal a marketplace has, and it cannot be reconstructed after the fact — which is why it
+   * is recorded at write time even though nothing reads it until a moderator asks.
+   */
   await pool.execute(
-    'INSERT INTO product_reviews (public_id, product_id, user_id, order_item_id, rating, title, body) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [randomUUID(), item.product_id, userId, item.id, rating, title ?? '', body],
+    `INSERT INTO product_reviews
+       (public_id, product_id, user_id, order_item_id, rating, title, body, submitted_ip)
+     VALUES (?, ?, ?, ?, ?, ?, ?, INET6_ATON(?))`,
+    [randomUUID(), item.product_id, userId, item.id, rating, title ?? '', body, ip],
   )
   await recomputeProductRating(item.product_id)
+  await recomputeSellerRating(item.seller_id)
 
   const product = await queryOne('SELECT slug FROM products WHERE id = ?', [item.product_id])
   return listForProduct(product.slug)
@@ -141,26 +170,76 @@ export async function createReview(userId, { orderItemId, rating, title, body })
  * query — an admin's "average rating" / "needs attention" count must reflect the whole
  * platform, not just whichever page of rows happened to render.
  */
-export async function listForAdmin() {
-  const [rows, [aggregate]] = await Promise.all([
+/**
+ * Every review on the marketplace, for staff.
+ *
+ * Took no arguments and returned a hard `LIMIT 200` — so on a marketplace with more reviews
+ * than that, the ones past the cap were unreachable from the panel entirely, and the summary
+ * counts underneath described the whole table while the list described the first two hundred.
+ *
+ * `rating` filters to a single star value and `needsAttention` to the one- and two-star reviews
+ * that are actually worth a moderator's time.
+ */
+export async function listForAdmin({ page = 1, pageSize = 25, search = '', rating, needsAttention = false } = {}) {
+  const where = []
+  const params = []
+
+  if (search) {
+    where.push('(p.name LIKE ? OR u.full_name LIKE ? OR r.title LIKE ? OR r.body LIKE ?)')
+    const like = `%${search}%`
+    params.push(like, like, like, like)
+  }
+  if (rating) { where.push('r.rating = ?'); params.push(rating) }
+  // Deliberately separate from `rating`: "needs attention" is a judgement about which reviews
+  // are worth opening, not a filter on a number.
+  if (needsAttention) where.push('r.rating <= 2')
+
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : ''
+
+  const [rows, [{ total }], [aggregate]] = await Promise.all([
     query(
       `SELECT r.public_id, r.rating, r.title, r.body, r.created_at, u.full_name,
-              p.name AS product_name, p.slug AS product_slug, s.store_name AS seller_name
+              u.public_id AS author_public_id,
+              p.public_id AS product_public_id, p.name AS product_name, p.slug AS product_slug,
+              s.public_id AS seller_public_id, s.store_name AS seller_name
          FROM product_reviews r
          JOIN products p ON p.id = r.product_id
          JOIN sellers s ON s.id = p.seller_id
          JOIN users u ON u.id = r.user_id
+         ${whereSql}
         ORDER BY r.created_at DESC
-        LIMIT 200`,
+        LIMIT ? OFFSET ?`,
+      [...params, pageSize, (page - 1) * pageSize],
     ),
+    query(
+      `SELECT COUNT(*) AS total
+         FROM product_reviews r
+         JOIN products p ON p.id = r.product_id
+         JOIN users u ON u.id = r.user_id
+         ${whereSql}`,
+      params,
+    ),
+    // The summary describes every review, not the filtered page: it is the context a moderator
+    // reads the page against.
     query(
       `SELECT COUNT(*) AS count, COALESCE(AVG(rating), 0) AS average,
               SUM(rating <= 2) AS needs_attention
          FROM product_reviews`,
     ),
   ])
+
   return {
-    reviews: rows.map((row) => ({ ...shapeReview(row), productName: row.product_name, productSlug: row.product_slug, sellerName: row.seller_name })),
+    reviews: rows.map((row) => ({
+      ...shapeReview(row),
+      // Ids, so the product, the store and the author are all reachable from a row.
+      productId: row.product_public_id,
+      productName: row.product_name,
+      productSlug: row.product_slug,
+      sellerId: row.seller_public_id,
+      sellerName: row.seller_name,
+      authorId: row.author_public_id,
+    })),
+    total: Number(total),
     summary: {
       count: Number(aggregate.count),
       average: Number(Number(aggregate.average).toFixed(2)),
@@ -170,33 +249,61 @@ export async function listForAdmin() {
 }
 
 /** A seller's reviews across their own products — the seller panel's Reviews page. */
-export async function listForSeller(sellerId) {
-  const rows = await query(
-    `SELECT r.public_id, r.rating, r.title, r.body, r.created_at, u.full_name,
-            p.name AS product_name, p.slug AS product_slug
-       FROM product_reviews r
-       JOIN products p ON p.id = r.product_id
-       JOIN users u ON u.id = r.user_id
-      WHERE p.seller_id = ?
-      ORDER BY r.created_at DESC`,
-    [sellerId],
-  )
+/**
+ * A store's reviews across its own products.
+ *
+ * Returned every review the store had ever received and computed the summary in JavaScript by
+ * counting the array — which meant the figures only ever described what had been fetched.
+ * Both the page and the summary come from the database now.
+ */
+export async function listForSeller(sellerId, { page = 1, pageSize = 25, rating, needsAttention = false } = {}) {
+  const where = ['p.seller_id = ?']
+  const params = [sellerId]
+  if (rating) { where.push('r.rating = ?'); params.push(rating) }
+  if (needsAttention) where.push('r.rating <= 2')
+  const whereSql = where.join(' AND ')
 
-  const reviews = rows.map((row) => ({
-    ...shapeReview(row),
-    productName: row.product_name,
-    productSlug: row.product_slug,
-  }))
+  const [rows, [{ total }], [aggregate]] = await Promise.all([
+    query(
+      `SELECT r.public_id, r.rating, r.title, r.body, r.created_at, u.full_name,
+              p.public_id AS product_public_id, p.name AS product_name, p.slug AS product_slug
+         FROM product_reviews r
+         JOIN products p ON p.id = r.product_id
+         JOIN users u ON u.id = r.user_id
+        WHERE ${whereSql}
+        ORDER BY r.created_at DESC
+        LIMIT ? OFFSET ?`,
+      [...params, pageSize, (page - 1) * pageSize],
+    ),
+    query(
+      `SELECT COUNT(*) AS total FROM product_reviews r
+         JOIN products p ON p.id = r.product_id
+        WHERE ${whereSql}`,
+      params,
+    ),
+    query(
+      `SELECT COUNT(*) AS count, COALESCE(AVG(r.rating), 0) AS average,
+              SUM(r.rating <= 2) AS needs_attention
+         FROM product_reviews r JOIN products p ON p.id = r.product_id
+        WHERE p.seller_id = ?`,
+      [sellerId],
+    ),
+  ])
 
-  const total = reviews.length
   return {
-    reviews,
+    reviews: rows.map((row) => ({
+      ...shapeReview(row),
+      productId: row.product_public_id,
+      productName: row.product_name,
+      productSlug: row.product_slug,
+    })),
+    total: Number(total),
     summary: {
-      count: total,
+      count: Number(aggregate.count),
       // Averaged across this seller's real reviews only — never a platform-wide figure
       // presented as if it were the seller's own.
-      average: total === 0 ? 0 : Number((reviews.reduce((sum, r) => sum + r.rating, 0) / total).toFixed(2)),
-      needsAttention: reviews.filter((r) => r.rating <= 2).length,
+      average: Number(Number(aggregate.average).toFixed(2)),
+      needsAttention: Number(aggregate.needs_attention),
     },
   }
 }

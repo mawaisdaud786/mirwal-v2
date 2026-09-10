@@ -91,16 +91,30 @@ test('an admin cannot suspend their own account', async () => {
 })
 
 test('the sessions list shows only live sessions', async () => {
+  /**
+   * Asserted per row, not as a count.
+   *
+   * The count version compared two different moments — the endpoint's, and a `COUNT(*)` run
+   * afterwards — and every other test file in the suite logs in and out in between, so it
+   * failed on timing rather than on behaviour. The property that actually matters is that
+   * nothing revoked or expired is listed, and that survives whatever else is happening.
+   */
   const { status, body } = await apiFetch(server.baseUrl, '/admin/sessions?pageSize=200', { token: adminToken })
   assert.equal(status, 200)
 
-  const [{ live }] = await query(
-    'SELECT COUNT(*) AS live FROM refresh_tokens WHERE revoked_at IS NULL AND expires_at > NOW()',
+  const listed = body.data.items.map((item) => item.id)
+  assert.ok(listed.length > 0, 'this test signed in, so at least one session must be live')
+
+  const stale = await query(
+    `SELECT COUNT(*) AS n FROM refresh_tokens
+      WHERE id IN (${listed.map(() => '?').join(',')})
+        AND (revoked_at IS NOT NULL OR expires_at <= NOW())`,
+    listed,
   )
-  assert.equal(body.data.pagination.total, Number(live))
-  // A revoked token is history, not a session.
-  const [{ revoked }] = await query('SELECT COUNT(*) AS revoked FROM refresh_tokens WHERE revoked_at IS NOT NULL')
-  if (Number(revoked) > 0) assert.ok(body.data.pagination.total < Number(live) + Number(revoked))
+  assert.equal(Number(stale[0].n), 0, 'a revoked or expired token is history, not a session')
+
+  // And the total is a real count rather than the page size or a constant.
+  assert.ok(body.data.pagination.total >= listed.length)
 })
 
 // ---------------------------------------------------------------------------

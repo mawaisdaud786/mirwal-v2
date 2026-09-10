@@ -2,6 +2,8 @@ import { query, queryOne, withTransaction } from '../../db/pool.js'
 import { badRequest, conflict, forbidden, notFound } from '../../lib/errors.js'
 import { formatMoney } from '../../lib/money.js'
 import { parseJsonColumn } from '../../lib/json.js'
+import { screenProduct, recordScreening } from '../catalog/moderation.service.js'
+import { assertBrandAccess } from '../catalog/brandAuth.service.js'
 
 /**
  * Seller product management — the write side of a seller's own catalogue.
@@ -139,9 +141,25 @@ export async function getProduct(sellerId, publicId) {
 export async function createProduct(sellerId, input) {
   const categoryId = await resolveCategoryId(input.categorySlug)
   const brandId = await resolveBrandId(input.brandSlug)
+  // A gated brand needs an authorisation on file. Refusing the listing rather than the seller:
+  // mis-picking from a dropdown and selling fakes should not carry the same penalty.
+  await assertBrandAccess(sellerId, brandId)
   const slug = await uniqueProductSlug(input.name)
   const status = input.status === 'draft' ? 'draft' : 'pending_review'
 
+  /**
+   * Automated screening, before the row exists.
+   *
+   * A `block` rule throws here — prohibited goods are refused at submission, where the seller
+   * is told why, rather than silently never appearing. Everything else only scores the
+   * listing so the review queue can be sorted by risk instead of by arrival.
+   *
+   * Drafts are screened too: a seller who saves a draft and submits it later should learn
+   * about a prohibited item at the point they wrote it, not days afterwards.
+   */
+  const screening = await screenProduct(input)
+
+  let createdId = null
   const publicId = await withTransaction(async (connection) => {
     const [result] = await connection.execute(
       `INSERT INTO products
@@ -181,8 +199,13 @@ export async function createProduct(sellerId, input) {
     await connection.execute('UPDATE sellers SET product_count = product_count + 1 WHERE id = ?', [sellerId])
 
     const [[created]] = await connection.execute('SELECT public_id FROM products WHERE id = ?', [productId])
+    // Recorded inside the transaction would tie a review aid to the listing's own success;
+    // the id is carried out instead so screening is written once the product genuinely exists.
+    createdId = productId
     return created.public_id
   })
+
+  await recordScreening(createdId, screening, { actorSide: 'seller' })
 
   return getProduct(sellerId, publicId)
 }
@@ -226,6 +249,14 @@ export async function updateProduct(sellerId, publicId, input) {
 
   const requiresReview = product.status === 'active'
   if (requiresReview) { sets.push("status = 'pending_review'") }
+
+  // An edit is a fresh submission as far as screening is concerned: the words that matter may
+  // be the ones that just changed.
+  const screening = await screenProduct({
+    name: input.name ?? product.name,
+    description: input.description,
+    subtitle: input.subtitle,
+  })
   sets.push('updated_at = NOW(3)')
 
   await withTransaction(async (connection) => {
@@ -247,6 +278,8 @@ export async function updateProduct(sellerId, publicId, input) {
       }
     }
   })
+
+  await recordScreening(product.id, screening, { actorSide: 'seller' })
 
   const updated = await getProduct(sellerId, publicId)
   return { product: updated, returnedToReview: requiresReview }
@@ -319,4 +352,89 @@ export async function getProductFormOptions() {
     brands: brands.map((row) => ({ slug: row.slug, name: row.name })),
     conditions: ['new', 'refurbished', 'used'],
   }
+}
+
+/**
+ * A store's own listings, paged.
+ *
+ * Returned every listing the store had ever created in one response, and the panel filtered
+ * that array in the browser — so a seller with two thousand SKUs downloaded all of them to look
+ * at ten, and the search box could only find what had already arrived.
+ */
+export async function listForSeller(sellerId, { page = 1, pageSize = 25, status, search } = {}) {
+  const where = ['p.seller_id = ?', 'p.deleted_at IS NULL']
+  const params = [sellerId]
+
+  if (status) { where.push('p.status = ?'); params.push(status) }
+  if (search) {
+    where.push('(p.name LIKE ? OR v.sku LIKE ?)')
+    const like = `%${search}%`
+    params.push(like, like)
+  }
+  const whereSql = where.join(' AND ')
+
+  const rows = await query(
+    `SELECT p.public_id, p.slug, p.name, p.status, p.price, p.currency_code,
+            p.rating_average, p.rating_count, p.created_at,
+            c.slug AS category_slug, c.name AS category_name,
+            b.slug AS brand_slug, b.name AS brand_name,
+            COALESCE(SUM(GREATEST(i.quantity - i.reserved, 0)), 0) AS sellable,
+            (SELECT url FROM product_images WHERE product_id = p.id ORDER BY position, id LIMIT 1) AS image_url
+       FROM products p
+       LEFT JOIN categories c ON c.id = p.category_id
+       LEFT JOIN brands b ON b.id = p.brand_id
+       LEFT JOIN product_variants v ON v.product_id = p.id AND v.is_active = 1
+       LEFT JOIN inventory i ON i.variant_id = v.id
+      WHERE ${whereSql}
+      GROUP BY p.id
+      ORDER BY p.created_at DESC
+      LIMIT ? OFFSET ?`,
+    [...params, pageSize, (page - 1) * pageSize],
+  )
+
+  /**
+   * Counted over distinct products, not joined rows.
+   *
+   * The variant and inventory joins multiply each product by its variants, so a plain
+   * `COUNT(*)` here would report a store with three-variant products as having three times the
+   * catalogue it does.
+   */
+  const [{ total }] = await query(
+    `SELECT COUNT(DISTINCT p.id) AS total
+       FROM products p
+       LEFT JOIN product_variants v ON v.product_id = p.id AND v.is_active = 1
+      WHERE ${whereSql}`,
+    params,
+  )
+
+  const items = rows.map((row) => ({
+    id: row.public_id,
+    slug: row.slug,
+    name: row.name,
+    status: row.status,
+    price: { amount: String(row.price), currency: row.currency_code },
+    rating: { average: Number(row.rating_average), count: row.rating_count },
+    stock: Number(row.sellable),
+    category: row.category_slug ? { slug: row.category_slug, name: row.category_name } : null,
+    brand: row.brand_slug ? { slug: row.brand_slug, name: row.brand_name } : null,
+    imageUrl: row.image_url ?? null,
+    createdAt: row.created_at,
+  }))
+
+  return { items, total: Number(total) }
+}
+
+/** How many listings sit in each state, over the whole store rather than the visible page. */
+export async function statusCountsForSeller(sellerId) {
+  const rows = await query(
+    `SELECT status, COUNT(*) AS n FROM products
+      WHERE seller_id = ? AND deleted_at IS NULL GROUP BY status`,
+    [sellerId],
+  )
+  const counts = { all: 0 }
+  for (const row of rows) {
+    counts[row.status] = Number(row.n)
+    counts.all += Number(row.n)
+  }
+  return counts
 }

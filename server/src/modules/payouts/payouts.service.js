@@ -1,6 +1,9 @@
 import { query, queryOne, withTransaction } from '../../db/pool.js'
 import { badRequest, conflict, notFound } from '../../lib/errors.js'
 import { formatMoney } from '../../lib/money.js'
+import { getNumericSetting } from '../settings/settings.service.js'
+import { defaultAccountId, payoutEligibility } from '../sellers/bank.service.js'
+import { getBalance, record as recordLedger } from './ledger.service.js'
 
 /**
  * Seller payouts.
@@ -53,7 +56,8 @@ function shapePayout(row) {
     failureReason: row.failure_reason,
     notes: row.notes,
     itemCount: row.item_count == null ? undefined : Number(row.item_count),
-    seller: row.seller_slug ? { slug: row.seller_slug, name: row.seller_store_name } : null,
+    // The public id is what makes the store column a link rather than a dead string.
+    seller: row.seller_slug ? { id: row.seller_public_id, slug: row.seller_slug, name: row.seller_store_name } : null,
     requestedAt: row.requested_at,
     approvedAt: row.approved_at,
     paidAt: row.paid_at,
@@ -66,7 +70,7 @@ const PAYOUT_SELECT = `
          p.gross_amount, p.commission_amount, p.net_amount, p.currency_code,
          p.method, p.destination_hint, p.external_reference, p.failure_reason, p.notes,
          p.requested_at, p.approved_at, p.paid_at,
-         s.slug AS seller_slug, s.store_name AS seller_store_name,
+         s.public_id AS seller_public_id, s.slug AS seller_slug, s.store_name AS seller_store_name,
          a.full_name AS approver_name,
          (SELECT COUNT(*) FROM payout_items pi WHERE pi.payout_id = p.id) AS item_count
     FROM payouts p
@@ -95,27 +99,29 @@ export async function listPayouts(scope, { page = 1, pageSize = 25, status } = {
  * excluding anything already attached to a payout. That NOT EXISTS is what stops the same
  * earnings appearing in two withdrawal requests.
  */
+/**
+ * What this seller could be paid right now.
+ *
+ * Reads the ledger. It used to derive "delivered items not attached to a payout", which could
+ * not express a hold, a reserve against an open return, a refund that landed after a payout,
+ * an adjustment or tax — and gave a seller a number nobody could explain line by line.
+ *
+ * The eligibility check is folded in so the caller gets one answer to "can I withdraw, and if
+ * not, why not" rather than a number and a separate silent refusal.
+ */
 export async function getAvailableBalance(sellerId) {
-  const [row] = await query(
-    `SELECT COALESCE(SUM(oi.line_total), 0) AS gross, COUNT(*) AS item_count
-       FROM order_items oi
-      WHERE oi.seller_id = ?
-        AND oi.status = 'delivered'
-        AND NOT EXISTS (SELECT 1 FROM payout_items pi WHERE pi.order_item_id = oi.id)`,
-    [sellerId],
-  )
-  const bps = await commissionBps()
-  const gross = Number(row.gross)
-  const commission = Math.round(gross * bps) / 10000
+  const [balance, eligibility] = await Promise.all([
+    getBalance(sellerId),
+    payoutEligibility(sellerId),
+  ])
+
   return {
-    grossAmount: formatMoney(gross.toFixed(2), 'PKR'),
-    commissionAmount: formatMoney(commission.toFixed(2), 'PKR'),
-    netAmount: formatMoney((gross - commission).toFixed(2), 'PKR'),
-    commissionPercent: bps / 100,
-    itemCount: Number(row.item_count),
-    // Below this a transfer costs more in fees than it moves.
-    minimumAmount: formatMoney('1000.00', 'PKR'),
-    canRequest: gross - commission >= 1000,
+    ...balance,
+    grossAmount: balance.lifetime,
+    commissionPercent: (await commissionBps()) / 100,
+    canRequest: balance.canRequest && eligibility.eligible,
+    blockedReason: eligibility.eligible ? balance.blockedReason : eligibility.reason,
+    blockedCode: eligibility.eligible ? null : eligibility.code,
   }
 }
 
@@ -152,32 +158,114 @@ export async function getPayout(scope, publicId) {
  */
 export async function requestPayout(sellerId, input = {}) {
   const existing = await queryOne(
-    "SELECT id FROM payouts WHERE seller_id = ? AND status IN ('requested','approved','processing')",
+    "SELECT id FROM payouts WHERE seller_id = ? AND status IN ('requested','on_hold','approved','processing')",
     [sellerId],
   )
   if (existing) {
     throw conflict('You already have a withdrawal in progress. It must complete before requesting another.', 'PAYOUT_IN_PROGRESS')
   }
 
+  /**
+   * Can this seller be paid at all?
+   *
+   * Checked before anything is assembled, and it answers with a reason rather than a boolean:
+   * a store that is suspended, has no verified payout account, or is inside the cooling-off
+   * window after changing its bank details must be told which of those it is. A refused
+   * withdrawal with no explanation is the seller-support ticket this exists to prevent.
+   */
+  const eligibility = await payoutEligibility(sellerId)
+  if (!eligibility.eligible) {
+    throw conflict(eligibility.reason, eligibility.code)
+  }
+
+  const balance = await getBalance(sellerId)
+  if (!balance.canRequest) {
+    throw badRequest(balance.blockedReason ?? 'There is nothing available to withdraw.', 'NOTHING_TO_PAY')
+  }
+
+  const bankAccountId = await defaultAccountId(sellerId)
   const bps = await commissionBps()
 
   return withTransaction(async (connection) => {
-    const [items] = await connection.execute(
-      `SELECT oi.id, oi.line_total
-         FROM order_items oi
-        WHERE oi.seller_id = ?
-          AND oi.status = 'delivered'
-          AND NOT EXISTS (SELECT 1 FROM payout_items pi WHERE pi.order_item_id = oi.id)
+    /**
+     * Which earnings this withdrawal pays for.
+     *
+     * Three conditions, and the last two are new:
+     *
+     *   - delivered and not already attached to a payout, as before;
+     *   - **matured** — past the hold window, so money is not paid out before the buyer's
+     *     return window closes and it becomes recoverable;
+     *   - **not reserved** — no open return against the item, so Mirwal does not hand over
+     *     money it is about to owe back.
+     *
+     * Driven off the ledger rather than off `order_items` directly, because the ledger is
+     * where the hold and the reversals live. `FOR UPDATE` locks the rows so two simultaneous
+     * withdrawal requests cannot both claim the same earnings.
+     */
+    const [entries] = await connection.execute(
+      `SELECT e.order_item_id, e.amount
+         FROM seller_ledger_entries e
+        WHERE e.seller_id = ?
+          AND e.entry_type = 'sale'
+          AND e.available_at <= NOW(3)
+          AND e.order_item_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM payout_items pi WHERE pi.order_item_id = e.order_item_id)
+          AND NOT EXISTS (
+                SELECT 1 FROM return_requests r
+                 WHERE r.order_item_id = e.order_item_id
+                   AND r.status IN ('requested','more_info_required','approved','in_transit','received','escalated')
+              )
         FOR UPDATE`,
       [sellerId],
     )
-    if (!items.length) throw badRequest('There are no delivered orders awaiting payout.', 'NOTHING_TO_PAY')
+    /**
+     * What this withdrawal is worth.
+     *
+     * The available balance, not the sum of the claimable order items. Those are usually the
+     * same number, and deliberately are not required to be: an adjustment, a reversed penalty
+     * or a returned commission is money Mirwal owes with no order item behind it, and paying
+     * only what maps to a line would strand it permanently.
+     *
+     * `entries` is still collected and linked through `payout_items`, because that is what
+     * makes a payout explainable — and what `uq_payout_items_item` uses to guarantee no order
+     * item is ever paid twice.
+     */
+    const gross = balance.availableAmount
+    /**
+     * Commission was already taken.
+     *
+     * Every `sale` entry is posted alongside its own negative `commission` entry, so the
+     * available balance is net of commission before this function sees it. Deducting again
+     * here would charge the seller the marketplace's cut twice — the figure below is recorded
+     * for the statement, not subtracted from the payout.
+     */
+    const commission = entries.reduce(
+      (sum, entry) => sum + Math.round(Number(entry.amount) * bps) / 10000, 0,
+    )
 
-    const gross = items.reduce((sum, item) => sum + Number(item.line_total), 0)
-    const commission = Math.round(gross * bps) / 10000
-    const net = gross - commission
-    if (net < 1000) {
-      throw badRequest('The minimum withdrawal is Rs. 1,000.', 'BELOW_MINIMUM')
+    /**
+     * Withholding tax.
+     *
+     * Deducted at source because Pakistani sellers are taxed at source; recording it as its
+     * own ledger entry rather than folding it into the commission is what lets a seller's
+     * statement — and eventually their tax certificate — show the two separately.
+     */
+    const withholdingBps = await getNumericSetting('finance.withholding_tax_bps', { fallback: 0, max: 10_000 })
+    // Levied on what the seller actually receives, which `gross` already is.
+    const tax = Math.round(gross * withholdingBps) / 10000
+
+    const net = gross - tax
+    /**
+     * The pre-deduction figure, reconstructed for the statement.
+     *
+     * A seller reading "you were paid Rs. 45,000" needs to see the Rs. 50,000 it came from and
+     * the two deductions between them; storing only the net would make the payout row
+     * unexplainable on its own.
+     */
+    const grossBeforeDeductions = Math.round((net + commission + tax) * 100) / 100
+    const minimum = await getNumericSetting('finance.payout_minimum', { fallback: 1000, max: 1_000_000 })
+    if (net < minimum) {
+      throw badRequest(`The minimum withdrawal is Rs. ${minimum.toLocaleString('en-PK')}.`, 'BELOW_MINIMUM')
     }
 
     const [[{ next }]] = await connection.execute('SELECT COALESCE(MAX(id), 0) + 1 AS next FROM payouts')
@@ -185,24 +273,45 @@ export async function requestPayout(sellerId, input = {}) {
 
     const [result] = await connection.execute(
       `INSERT INTO payouts
-         (public_id, reference, seller_id, gross_amount, commission_amount, net_amount,
-          currency_code, status, method, destination_hint, requested_at, created_at, updated_at)
-       VALUES (UUID(), ?, ?, ?, ?, ?, 'PKR', 'requested', ?, ?, NOW(3), NOW(3), NOW(3))`,
+         (public_id, reference, seller_id, gross_amount, commission_amount, tax_withheld, net_amount,
+          currency_code, status, method, bank_account_id, destination_hint,
+          requested_at, created_at, updated_at)
+       VALUES (UUID(), ?, ?, ?, ?, ?, ?, 'PKR', 'requested', ?, ?, ?, NOW(3), NOW(3), NOW(3))`,
       [
-        reference, sellerId, gross.toFixed(2), commission.toFixed(2), net.toFixed(2),
-        input.method ?? 'bank_transfer', input.destinationHint ?? null,
+        reference, sellerId, grossBeforeDeductions.toFixed(2), commission.toFixed(2), tax.toFixed(2), net.toFixed(2),
+        input.method ?? 'bank_transfer', bankAccountId, input.destinationHint ?? null,
       ],
     )
 
-    for (const item of items) {
+    for (const entry of entries) {
       await connection.execute(
         'INSERT INTO payout_items (payout_id, order_item_id, amount, created_at) VALUES (?, ?, ?, NOW(3))',
-        [result.insertId, item.id, Number(item.line_total).toFixed(2)],
+        [result.insertId, entry.order_item_id, Number(entry.amount).toFixed(2)],
       )
     }
 
+    // The money leaving is itself a ledger entry, so the balance drops the moment a
+    // withdrawal is requested rather than when it is eventually paid. Without that a seller
+    // could request, see the same balance, and request again.
+    await recordLedger(connection, {
+      sellerId,
+      entryType: 'payout',
+      amount: -net,
+      payoutId: result.insertId,
+      description: `Withdrawal ${reference}`,
+    })
+    if (tax > 0) {
+      await recordLedger(connection, {
+        sellerId,
+        entryType: 'tax_withheld',
+        amount: -tax,
+        payoutId: result.insertId,
+        description: `Withholding tax on ${reference}`,
+      })
+    }
+
     const [[row]] = await connection.execute('SELECT public_id FROM payouts WHERE id = ?', [result.insertId])
-    return { publicId: row.public_id, reference, itemCount: items.length }
+    return { publicId: row.public_id, reference, itemCount: entries.length, netAmount: net.toFixed(2) }
   })
 }
 

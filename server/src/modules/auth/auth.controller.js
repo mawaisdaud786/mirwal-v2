@@ -156,7 +156,7 @@ export async function requestPasswordReset(req, res, next) {
       // The link is built from configured environment, never from a request header: a reset
       // URL taken from Host would point wherever the caller chose.
       const resetUrl = `${env.storefrontUrl}/reset-password?token=${encodeURIComponent(result.token)}`
-      await messaging.send('account.password_reset', {
+      messaging.sendInBackground('account.password_reset', {
         channel: 'email',
         to: result.user.email,
         variables: {
@@ -178,7 +178,7 @@ export async function resetPassword(req, res, next) {
   try {
     const account = await service.completePasswordReset(req.body.token, req.body.password)
     // Told after the fact, so a reset the account holder did not ask for is noticed.
-    await messaging.send('account.password_changed', {
+    messaging.sendInBackground('account.password_changed', {
       channel: 'email', to: account.email, variables: { name: account.name },
     })
     return ok(res, null, 'Your password has been changed. Sign in with the new one.')

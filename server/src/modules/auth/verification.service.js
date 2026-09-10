@@ -2,7 +2,9 @@ import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto
 import { query, queryOne } from '../../db/pool.js'
 import { badRequest, conflict, notFound, tooMany } from '../../lib/errors.js'
 import { toSqlDateTime } from '../../lib/tokens.js'
+import { env } from '../../config/env.js'
 import * as messaging from '../messaging/messaging.service.js'
+import { messagingCapabilities } from '../../lib/mailer.js'
 
 /**
  * Proving that an email address and a phone number belong to the person using them.
@@ -111,9 +113,33 @@ export async function requestVerification(userId, purpose, { appUrl } = {}) {
     [userId, purpose, destination, hash(secret), toSqlDateTime(expires)],
   )
 
-  if (purpose === 'email') {
-    const link = `${String(appUrl ?? '').replace(/\/$/, '')}/verify-email?token=${encodeURIComponent(secret)}`
-    await messaging.send('account.verify_email', {
+  const link = purpose === 'email'
+    ? `${String(appUrl ?? '').replace(/\/$/, '')}/verify-email?token=${encodeURIComponent(secret)}`
+    : null
+
+  /**
+   * Hand the message to the transport without waiting for it.
+   *
+   * This used to `await` the send so it could report truthfully whether delivery succeeded.
+   * The honesty was right; the blocking was not. A real send against Gmail measured three to
+   * fourteen seconds, and every one of those seconds was a person watching a spinner after
+   * pressing "Send confirmation link" — which is how the button came to be reported as hanging.
+   *
+   * The distinction that rescues both properties: **whether a transport is configured is known
+   * instantly, but whether a message arrived is not.** The first is the case that actually
+   * mattered — an unconfigured SMTP server silently swallowing every verification email — and
+   * it is a synchronous check. The second was never knowable in the time a request should take,
+   * and pretending otherwise is what made the endpoint slow.
+   *
+   * So: report configuration synchronously, queue the delivery, and let the delivery ledger
+   * record the real outcome for the admin Email & SMS page.
+   */
+  const channel = purpose === 'email' ? 'email' : 'sms'
+  const capabilities = messagingCapabilities()
+  const configured = channel === 'email' ? capabilities.email.configured : capabilities.sms.configured
+
+  const dispatch = () => (purpose === 'email'
+    ? messaging.send('account.verify_email', {
       to: destination,
       userId,
       variables: { name: user.full_name, link, minutes: String(ttl) },
@@ -121,13 +147,21 @@ export async function requestVerification(userId, purpose, { appUrl } = {}) {
       // breaks it. Everything else stays escaped.
       rawVariables: ['link'],
     })
-  } else {
-    await messaging.send('account.verify_phone', {
+    : messaging.send('account.verify_phone', {
       to: destination,
       userId,
       channel: 'sms',
       variables: { name: user.full_name, code: secret, minutes: String(ttl) },
-    })
+    }))
+
+  if (configured) {
+    // Not awaited. `send()` never throws and records its own outcome, so there is nothing here
+    // that a caller could usefully do with the result — and everything to lose by waiting.
+    dispatch().catch(() => {})
+  } else {
+    // Still dispatched, so the ledger keeps its record of every attempt and the admin page
+    // shows why nothing went out.
+    dispatch().catch(() => {})
   }
 
   return {
@@ -136,6 +170,32 @@ export async function requestVerification(userId, purpose, { appUrl } = {}) {
     // way to read back a number the caller may not already know in full.
     destination: purpose === 'email' ? maskEmail(destination) : maskPhone(destination),
     expiresInMinutes: ttl,
+
+    delivery: {
+      // 'queued' is the honest answer for a configured transport: it has been handed over, and
+      // whether it arrives is between Mirwal and the mail server. 'skipped' is equally honest
+      // and far more useful — it means nothing was even attempted, and says what to fix.
+      status: configured ? 'queued' : 'skipped',
+      reason: configured
+        ? null
+        : (channel === 'email'
+          ? 'No mail server is configured, so nothing was sent. Set SMTP_HOST in the API environment.'
+          : 'No SMS gateway is configured, so nothing was sent. Set SMS_API_URL and SMS_API_KEY.'),
+    },
+
+    /**
+     * The secret itself, in development only.
+     *
+     * Without a mail server or an SMS gateway there is otherwise no way to exercise this flow
+     * at all, and the alternative — reading it out of `message_deliveries` by hand — is what
+     * we were reduced to while building it.
+     *
+     * Guarded on `env.isProduction` rather than on a debug flag someone could switch on by
+     * accident. If this value ever reaches a production response it hands the caller a working
+     * verification token, so the condition is deliberately the narrowest one available and is
+     * checked here rather than in the controller, where a future route could forget it.
+     */
+    ...(env.isProduction ? {} : { devOnly: { code: purpose === 'phone' ? secret : null, link } }),
   }
 }
 

@@ -29,6 +29,15 @@ function shapeAdminProduct(row) {
     description: row.description ?? null,
     status: row.status,
     rejectedReason: row.rejected_reason ?? null,
+    /**
+     * What automated screening found at submission.
+     *
+     * A score, not a verdict: nothing here approves or rejects. It exists so a reviewer facing
+     * two hundred listings knows which one to open first, and so the flags that prompted the
+     * ordering are visible rather than implied.
+     */
+    moderationRisk: Number(row.moderation_risk ?? 0),
+    moderationFlags: parseJsonColumn(row.moderation_flags, []),
     condition: row.condition_type,
     price: formatMoney(row.price, row.currency_code),
     compareAtPrice: formatMoney(row.compare_at_price, row.currency_code),
@@ -51,6 +60,7 @@ function shapeAdminProduct(row) {
 
 const PRODUCT_SELECT = `
   SELECT p.id, p.public_id, p.slug, p.name, p.subtitle, p.description, p.status,
+         p.moderation_risk, p.moderation_flags,
          p.rejected_reason, p.condition_type, p.price, p.compare_at_price, p.cost_price,
          p.currency_code, p.rating_average, p.rating_count, p.published_at,
          p.created_at, p.updated_at,
@@ -74,12 +84,15 @@ const PRODUCT_SELECT = `
  * "why isn't this live?" needs to see drafts and rejections, which is exactly what the
  * storefront query filters out.
  */
-export async function listProducts({ page = 1, pageSize = 25, status, search, categoryId, sellerId, sort = 'newest' } = {}) {
+export async function listProducts({ page = 1, pageSize = 25, status, search, categoryId, brandId, sellerId, sort = 'newest' } = {}) {
   const where = ['p.deleted_at IS NULL']
   const params = []
 
   if (status) { where.push('p.status = ?'); params.push(status) }
   if (categoryId) { where.push('p.category_id = ?'); params.push(categoryId) }
+  // Added alongside category so a brand page can list what is sold under it — the same
+  // question, asked of the other taxonomy.
+  if (brandId) { where.push('p.brand_id = ?'); params.push(brandId) }
   if (sellerId) { where.push('p.seller_id = ?'); params.push(sellerId) }
   if (search) {
     where.push('(p.name LIKE ? OR p.slug LIKE ?)')
@@ -94,6 +107,9 @@ export async function listProducts({ page = 1, pageSize = 25, status, search, ca
     name: 'p.name ASC',
     'price-high': 'p.price DESC',
     'price-low': 'p.price ASC',
+    // Highest automated risk first, oldest as the tie-break so a queue of equally-clean
+    // listings still ages out rather than shuffling.
+    risk: 'p.moderation_risk DESC, p.created_at ASC',
   }
   const orderBy = ORDER[sort] ?? ORDER.newest
   const clause = `WHERE ${where.join(' AND ')}`
@@ -345,7 +361,7 @@ export async function setProductApproval(publicId, { approved, reason }) {
   }
   // Tell the seller either way. A rejection they never hear about is indistinguishable from
   // a listing still sitting in the queue.
-  await messaging.send(approved ? 'product.approved' : 'product.rejected', {
+  messaging.sendInBackground(approved ? 'product.approved' : 'product.rejected', {
     to: product.owner_email,
     userId: product.owner_id,
     variables: {
@@ -512,8 +528,11 @@ export async function deleteCategory(slug) {
 
 export async function listBrands() {
   const rows = await query(
-    `SELECT b.id, b.slug, b.name, b.description, b.logo_url, b.is_active, b.created_at,
-            (SELECT COUNT(*) FROM products p WHERE p.brand_id = b.id AND p.deleted_at IS NULL) AS product_count
+    `SELECT b.id, b.slug, b.name, b.description, b.logo_url, b.is_active, b.is_gated, b.gate_note,
+            b.created_at,
+            (SELECT COUNT(*) FROM products p WHERE p.brand_id = b.id AND p.deleted_at IS NULL) AS product_count,
+            (SELECT COUNT(*) FROM brand_authorizations a
+              WHERE a.brand_id = b.id AND a.status = 'pending') AS pending_requests
        FROM brands b ORDER BY b.name`,
   )
   return rows.map((row) => ({
@@ -523,6 +542,11 @@ export async function listBrands() {
     description: row.description,
     logoUrl: row.logo_url,
     isActive: Boolean(row.is_active),
+    // Gating is per brand: most need nothing, and demanding paperwork for all of them would
+    // stall the catalogue for no safety gain.
+    isGated: Boolean(row.is_gated),
+    gateNote: row.gate_note,
+    pendingRequests: Number(row.pending_requests),
     productCount: Number(row.product_count),
     createdAt: row.created_at,
   }))
@@ -595,7 +619,7 @@ export async function listInventory({ page = 1, pageSize = 50, lowOnly = false, 
   const rows = await query(
     `SELECT v.id AS variant_id, v.sku, v.name AS variant_name,
             p.public_id AS product_id, p.name AS product_name, p.slug AS product_slug, p.status,
-            s.slug AS seller_slug, s.store_name AS seller_name,
+            s.public_id AS seller_public_id, s.slug AS seller_slug, s.store_name AS seller_name,
             i.quantity, i.reserved, i.low_stock_threshold, i.allow_backorder, i.updated_at
        FROM product_variants v
        JOIN products p ON p.id = v.product_id
@@ -623,7 +647,8 @@ export async function listInventory({ page = 1, pageSize = 50, lowOnly = false, 
         sku: row.sku,
         variantName: row.variant_name,
         product: { id: row.product_id, name: row.product_name, slug: row.product_slug, status: row.status },
-        seller: { slug: row.seller_slug, name: row.seller_name },
+        // The public id makes the store column a link; the slug stays for anything reading it.
+        seller: { id: row.seller_public_id, slug: row.seller_slug, name: row.seller_name },
         quantity: Number(row.quantity),
         reserved: Number(row.reserved),
         available,

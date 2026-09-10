@@ -12,6 +12,7 @@ import { maintenanceMode } from './middleware/maintenance.js'
 import { notFoundHandler } from './middleware/notFound.js'
 import { errorHandler } from './middleware/errorHandler.js'
 import { ok } from './lib/errors.js'
+import { MEDIA_URL_PREFIX, mediaDirectory } from './lib/media.js'
 
 export function createApp() {
   const app = express()
@@ -54,9 +55,21 @@ export function createApp() {
   app.use(express.urlencoded({ extended: false, limit: '1mb' }))
   app.use(cookieParser())
 
+  /**
+   * The global limiter.
+   *
+   * Relaxed under test, and only there. The suite is a single process making several hundred
+   * requests in well under a minute, so the production limit throttles it and produces
+   * failures that look like application bugs but are the limiter working correctly — which is
+   * worse than no limiter in CI, because it teaches people to re-run a red suite until it
+   * goes green.
+   *
+   * The credential limiter in auth.routes.js is deliberately NOT relaxed: brute-force
+   * protection is behaviour the suite actually asserts on.
+   */
   app.use(rateLimit({
     windowMs: env.rateLimit.windowMs,
-    limit: env.rateLimit.max,
+    limit: env.isTest ? 100_000 : env.rateLimit.max,
     standardHeaders: 'draft-7',
     legacyHeaders: false,
     message: {
@@ -67,6 +80,30 @@ export function createApp() {
 
   // Populates req.user when a valid token is present; never rejects on its own.
   app.use(optionalAuth)
+
+  /**
+   * Public images: product photos, store logos and banners.
+   *
+   * This directory is emphatically NOT the one seller documents live in — see lib/media.js.
+   * Serving it needs three guards:
+   *   - `dotfiles: 'deny'` so a stray .env or .git in the directory is never readable;
+   *   - `index: false` so a missing file cannot list the directory's contents;
+   *   - a long immutable cache, which is safe because stored filenames are random and a
+   *     changed image is always a new name, never a new version of an old one.
+   */
+  app.use(MEDIA_URL_PREFIX, express.static(mediaDirectory(), {
+    dotfiles: 'deny',
+    index: false,
+    fallthrough: true,
+    maxAge: '365d',
+    immutable: true,
+    setHeaders(res) {
+      // These are user-uploaded bytes. Telling the browser not to sniff a content type stops
+      // an image that is secretly markup from being rendered as a page on this origin.
+      res.setHeader('X-Content-Type-Options', 'nosniff')
+      res.setHeader('Content-Disposition', 'inline')
+    },
+  }))
 
   app.get('/health', (_req, res) => ok(res, { status: 'ok', uptime: Math.round(process.uptime()) }))
 

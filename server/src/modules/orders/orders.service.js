@@ -2,12 +2,11 @@ import { randomUUID } from 'node:crypto'
 import { query, queryOne, withTransaction } from '../../db/pool.js'
 import { conflict, forbidden, notFound } from '../../lib/errors.js'
 import { formatMoney } from '../../lib/money.js'
-import { toSqlDateTime } from '../../lib/tokens.js'
 import { createNotification } from '../notifications/notifications.service.js'
 import { assertMethodAvailable } from '../payments/payments.service.js'
-import { createRefundForReturn, processRefund } from '../payments/refunds.service.js'
 import { getNumericSetting } from '../settings/settings.service.js'
 import { recordOrderEvent } from './events.service.js'
+import { postSaleEarning } from '../payouts/ledger.service.js'
 import { allocateToLines, computeTax, resolveCoupon, resolveShipping, round2 } from './pricing.service.js'
 
 /**
@@ -39,7 +38,7 @@ function shapeOrderItem(row) {
     quantity: row.quantity,
     lineTotal: formatMoney(row.line_total, row.currency_code),
     status: row.status,
-    seller: row.seller_slug ? { slug: row.seller_slug, name: row.seller_store_name } : null,
+    seller: row.seller_slug ? { id: row.seller_public_id, slug: row.seller_slug, name: row.seller_store_name } : null,
     image: row.image_url ?? null,
     // The seller fulfilling this item needs to know where it's going — same information a
     // courier waybill would carry, not a customer-identity leak.
@@ -51,6 +50,19 @@ function shapeOrderItem(row) {
     // Cancellation is the buyer's own right before anything ships; a return needs the
     // seller's review and is only possible after delivery — see migration 005.
     canCancel: ['pending', 'confirmed', 'processing'].includes(row.status),
+    /**
+     * What has already been pulled off this line.
+     *
+     * A quantity that silently drops from three to one is confusing on its own; showing the
+     * cancellation beside it is what makes the smaller number make sense. Null when nothing was
+     * cancelled, so the common line renders exactly as it always did.
+     */
+    cancelled: Number(row.cancelled_quantity) > 0 ? {
+      quantity: Number(row.cancelled_quantity),
+      amount: formatMoney(row.cancelled_amount, row.currency_code),
+      by: row.cancelled_by,
+      reason: row.cancelled_reason,
+    } : null,
     canRequestReturn: row.status === 'delivered' && !row.return_id,
     returnRequest: row.return_id ? {
       id: row.return_public_id,
@@ -99,8 +111,10 @@ function shapeOrder(row, items) {
 const ORDER_ITEM_SELECT = `
   SELECT oi.id, oi.product_id, oi.product_name, oi.variant_name, oi.sku,
          oi.unit_price, oi.quantity, oi.line_total, oi.status, oi.created_at,
+         oi.cancelled_quantity, oi.cancelled_amount, oi.cancelled_by, oi.cancelled_reason,
          p.public_id AS product_public_id, p.slug AS product_slug,
-         s.slug AS seller_slug, s.store_name AS seller_store_name,
+         s.public_id AS seller_public_id, s.slug AS seller_slug, s.store_name AS seller_store_name,
+         o.public_id AS order_public_id,
          o.currency_code, o.order_number, o.shipping_full_name, o.shipping_phone, o.shipping_city,
          (SELECT url FROM product_images WHERE product_id = oi.product_id ORDER BY position, id LIMIT 1) AS image_url,
          r.id AS return_id, r.public_id AS return_public_id, r.reason AS return_reason,
@@ -220,9 +234,7 @@ export async function createOrder(buyerId, {
     // Everything below is derived server-side. The client chose a shipping option and typed a
     // coupon code; it supplied no amounts, and none of these figures can be influenced by it
     // beyond those two choices.
-    const coupon = await resolveCoupon(connection, {
-      code: couponCode, buyerId, lines, subtotal,
-    })
+    const coupon = await resolveCoupon(connection, { code: couponCode, buyerId, lines })
     const discountTotal = coupon?.discount ?? 0
 
     const shipping = await resolveShipping(connection, {
@@ -361,19 +373,55 @@ export async function getOrderForBuyer(buyerId, publicId) {
 }
 
 /**
- * Every order sitewide, for the admin order list — unlike a buyer or seller view, this is
- * not scoped to anyone's ownership, because admin is the one role that legitimately sees
- * across the whole marketplace.
+ * Every order on the marketplace, for staff.
  *
- * `orders.status` itself is never updated after checkout — only `order_items.status` is,
- * since a multi-seller order is fulfilled per seller. Showing the raw column here would
- * read "Pending" forever regardless of what actually happened, so the displayed status is
- * the same items-rollup `ProfileOrdersPage.jsx` computes for the buyer's own view, computed
- * here in SQL so the list doesn't need a second query per order.
+ * Used to take no arguments and return the lot. That is fine at 700 orders and untenable at
+ * 70,000: the whole table crossed the wire on every visit to the page, and the panel's search
+ * box filtered whatever had arrived rather than asking the database — so an order the admin
+ * knew existed could simply fail to appear.
+ *
+ * The rolled-up status is computed in SQL rather than read from `orders.status` deliberately.
+ * The order row records where the order as a whole stands; what an operator scanning this list
+ * needs is what its items are actually doing, and the two legitimately disagree while a
+ * multi-seller order is half shipped.
  */
-export async function listOrdersForAdmin() {
+export async function listOrdersForAdmin({
+  page = 1, pageSize = 25, search = '', status = '', paymentStatus = '',
+} = {}) {
+  const where = []
+  const params = []
+
+  if (search) {
+    // Order number, buyer name and buyer email, because those are the three things somebody
+    // arrives holding when they need to find an order.
+    where.push('(o.order_number LIKE ? OR u.full_name LIKE ? OR u.email LIKE ?)')
+    const like = `%${search}%`
+    params.push(like, like, like)
+  }
+  if (paymentStatus) {
+    where.push('o.payment_status = ?')
+    params.push(paymentStatus)
+  }
+
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : ''
+
+  /**
+   * The rolled-up status is a HAVING, not a WHERE.
+   *
+   * It is derived from the aggregated item counts, which do not exist until after grouping.
+   * Filtering it in the WHERE clause would silently match nothing.
+   */
+  const havingSql = status
+    ? `HAVING (CASE
+                 WHEN COUNT(oi.id) > 0 AND SUM(oi.status = 'delivered') = COUNT(oi.id) THEN 'delivered'
+                 WHEN COUNT(oi.id) > 0 AND SUM(oi.status = 'cancelled') = COUNT(oi.id) THEN 'cancelled'
+                 WHEN SUM(oi.status = 'shipped') > 0 THEN 'shipped'
+                 ELSE 'processing'
+               END) = ?`
+    : ''
+
   const rows = await query(
-    `SELECT o.*, u.full_name AS buyer_name, u.email AS buyer_email,
+    `SELECT o.*, u.public_id AS buyer_public_id, u.full_name AS buyer_name, u.email AS buyer_email,
             COUNT(oi.id) AS item_count,
             SUM(oi.status = 'delivered') AS delivered_count,
             SUM(oi.status = 'cancelled') AS cancelled_count,
@@ -381,27 +429,82 @@ export async function listOrdersForAdmin() {
        FROM orders o
        JOIN users u ON u.id = o.buyer_id
        LEFT JOIN order_items oi ON oi.order_id = o.id
+       ${whereSql}
       GROUP BY o.id
-      ORDER BY o.created_at DESC`,
+      ${havingSql}
+      ORDER BY o.created_at DESC
+      LIMIT ? OFFSET ?`,
+    [...params, ...(status ? [status] : []), pageSize, (page - 1) * pageSize],
   )
-  return rows.map((row) => {
+
+  /**
+   * The count has to repeat the grouping.
+   *
+   * A plain `COUNT(*)` over the joined rows would count order items, not orders, and a status
+   * filter only exists after the group — so the total is the number of surviving groups.
+   */
+  const [{ total }] = await query(
+    `SELECT COUNT(*) AS total FROM (
+        SELECT o.id
+          FROM orders o
+          JOIN users u ON u.id = o.buyer_id
+          LEFT JOIN order_items oi ON oi.order_id = o.id
+          ${whereSql}
+         GROUP BY o.id
+         ${havingSql}
+     ) AS matched`,
+    [...params, ...(status ? [status] : [])],
+  )
+
+  const items = rows.map((row) => {
     const itemCount = Number(row.item_count)
-    const status = itemCount > 0 && Number(row.delivered_count) === itemCount ? 'delivered'
+    const rolledUp = itemCount > 0 && Number(row.delivered_count) === itemCount ? 'delivered'
       : itemCount > 0 && Number(row.cancelled_count) === itemCount ? 'cancelled'
-      : Number(row.shipped_count) > 0 ? 'shipped'
-      : 'processing'
+        : Number(row.shipped_count) > 0 ? 'shipped'
+          : 'processing'
     return {
       id: row.public_id,
       orderNumber: row.order_number,
-      buyer: { name: row.buyer_name, email: row.buyer_email },
+      // The id is what makes the buyer column a link rather than a dead string.
+      buyer: { id: row.buyer_public_id, name: row.buyer_name, email: row.buyer_email },
       itemCount,
       total: formatMoney(row.total, row.currency_code),
-      status,
+      status: rolledUp,
       paymentMethod: row.payment_method,
       paymentStatus: row.payment_status,
       createdAt: row.created_at,
     }
   })
+
+  return { items, total: Number(total) }
+}
+
+/** Headline counts for the list, over every order rather than the page being shown. */
+export async function orderCountsForAdmin() {
+  const [row] = await query(
+    `SELECT COUNT(*) AS total,
+            SUM(o.payment_status = 'paid') AS paid,
+            SUM(o.payment_status = 'pending') AS unpaid,
+            SUM(o.payment_status IN ('refunded', 'partially_refunded')) AS refunded
+       FROM orders o`,
+  )
+  const rolled = await query(
+    `SELECT rolled_up AS status, COUNT(*) AS n FROM (
+        SELECT CASE
+                 WHEN COUNT(oi.id) > 0 AND SUM(oi.status = 'delivered') = COUNT(oi.id) THEN 'delivered'
+                 WHEN COUNT(oi.id) > 0 AND SUM(oi.status = 'cancelled') = COUNT(oi.id) THEN 'cancelled'
+                 WHEN SUM(oi.status = 'shipped') > 0 THEN 'shipped'
+                 ELSE 'processing'
+               END AS rolled_up
+          FROM orders o LEFT JOIN order_items oi ON oi.order_id = o.id
+         GROUP BY o.id
+     ) AS grouped
+     GROUP BY rolled_up`,
+  )
+
+  const counts = { total: Number(row.total), paid: Number(row.paid ?? 0), unpaid: Number(row.unpaid ?? 0), refunded: Number(row.refunded ?? 0) }
+  for (const entry of rolled) counts[entry.status] = Number(entry.n)
+  return counts
 }
 
 export async function getOrderForAdmin(publicId) {
@@ -415,45 +518,183 @@ export async function getOrderForAdmin(publicId) {
   return { ...shapeOrder(row, await loadItemsForOrder(row.id)), buyer: { name: row.buyer_name, email: row.buyer_email } }
 }
 
-/** A seller's own fulfillment queue — every order_item that belongs to their store. */
-export async function listOrderItemsForSeller(sellerId) {
+/**
+ * The lines a store has to fulfil.
+ *
+ * Returned every order item the store had ever sold, and the panel filtered and counted that
+ * array in the browser — so a store with ten thousand lines downloaded all of them to work
+ * today's dispatches, and the status tabs described only what had arrived.
+ */
+export async function listOrderItemsForSeller(sellerId, { page = 1, pageSize = 25, status, search } = {}) {
+  const where = ['oi.seller_id = ?']
+  const params = [sellerId]
+
+  if (status === 'processing') {
+    // What the panel calls "processing" is the pre-dispatch group, not a single status.
+    where.push("oi.status IN ('pending', 'confirmed', 'processing')")
+  } else if (status) {
+    where.push('oi.status = ?')
+    params.push(status)
+  }
+  if (search) {
+    where.push('(o.order_number LIKE ? OR oi.product_name LIKE ? OR o.shipping_full_name LIKE ?)')
+    const like = `%${search}%`
+    params.push(like, like, like)
+  }
+  const whereSql = where.join(' AND ')
+
   const rows = await query(
-    `${ORDER_ITEM_SELECT}
-     WHERE oi.seller_id = ?
-     ORDER BY oi.created_at DESC`,
-    [sellerId],
+    `${ORDER_ITEM_SELECT} WHERE ${whereSql} ORDER BY oi.created_at DESC LIMIT ? OFFSET ?`,
+    [...params, pageSize, (page - 1) * pageSize],
   )
-  return rows.map((row) => ({
-    ...shapeOrderItem(row),
-    orderNumber: row.order_number,
-    placedAt: row.created_at,
-  }))
+  const [{ total }] = await query(
+    `SELECT COUNT(*) AS total FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE ${whereSql}`,
+    params,
+  )
+
+  return {
+    items: rows.map((row) => ({
+      ...shapeOrderItem(row),
+      orderNumber: row.order_number,
+      orderId: row.order_public_id,
+      placedAt: row.created_at,
+    })),
+    total: Number(total),
+  }
 }
 
+/** How many lines sit in each state, over the whole store rather than the visible page. */
+export async function orderItemCountsForSeller(sellerId) {
+  const rows = await query(
+    'SELECT status, COUNT(*) AS n FROM order_items WHERE seller_id = ? GROUP BY status',
+    [sellerId],
+  )
+  const counts = { all: 0, processing: 0 }
+  for (const row of rows) {
+    const n = Number(row.n)
+    counts[row.status] = n
+    counts.all += n
+    if (['pending', 'confirmed', 'processing'].includes(row.status)) counts.processing += n
+  }
+  return counts
+}
 /**
  * Update the status of one order item — a seller may only ever move their own items, and
  * only forward through the fulfillment lifecycle (or to cancelled).
  */
-export async function updateOrderItemStatusForSeller(sellerId, orderItemId, status) {
+export async function updateOrderItemStatusForSeller(sellerId, orderItemId, status, { reason } = {}) {
   const item = await queryOne(
-    'SELECT id, seller_id, status FROM order_items WHERE id = ?',
+    'SELECT id, order_id, seller_id, status, line_total, discount_amount, discount_funded_by FROM order_items WHERE id = ?',
     [orderItemId],
   )
   if (!item) throw notFound('Order item not found.', 'ORDER_ITEM_NOT_FOUND')
   if (item.seller_id !== sellerId) throw forbidden('This order item does not belong to your store.')
 
-  const FORWARD = { pending: ['confirmed', 'cancelled'], confirmed: ['processing', 'cancelled'], processing: ['shipped', 'cancelled'], shipped: ['delivered'], delivered: [], cancelled: [] }
+  /**
+   * The lifecycle.
+   *
+   * `failed_delivery` is new and is not a synonym for cancelled: the seller shipped, performed
+   * correctly, and the courier could not hand the parcel over. Scoring that as a cancellation
+   * — which the old three-outcome model forced — punishes a seller for a buyer being out.
+   * From there the parcel is either re-attempted (back to shipped) or comes back (returned).
+   */
+  const FORWARD = {
+    pending: ['confirmed', 'cancelled'],
+    confirmed: ['processing', 'cancelled'],
+    processing: ['shipped', 'cancelled'],
+    shipped: ['delivered', 'failed_delivery'],
+    failed_delivery: ['shipped', 'delivered', 'returned'],
+    delivered: [],
+    cancelled: [],
+    returned: [],
+  }
   if (!FORWARD[item.status]?.includes(status)) {
     throw conflict(`Cannot move an order item from "${item.status}" to "${status}".`, 'INVALID_STATUS_TRANSITION')
   }
 
-  await query('UPDATE order_items SET status = ?, updated_at = ? WHERE id = ?', [status, toSqlDateTime(), orderItemId])
-  const updated = await queryOne(`${ORDER_ITEM_SELECT} WHERE oi.id = ?`, [orderItemId])
+  /**
+   * "Shipped" is not a status a seller may simply assert.
+   *
+   * It is what a shipment *means*, and a shipment carries a carrier, a tracking number and a
+   * dispatch time — the things a buyer needs to follow their parcel and the only evidence
+   * either side has in a "it never arrived" dispute. Allowing this status to be set directly
+   * left it decorative, which is exactly the state this whole area was built to fix.
+   *
+   * The exception is a re-attempt after a failed delivery: the shipment already exists, the
+   * courier is simply trying again, and forcing a second shipment row would misrepresent one
+   * parcel as two.
+   */
+  if (status === 'shipped' && item.status !== 'failed_delivery') {
+    throw conflict(
+      'Create a shipment with the carrier and tracking number instead — that is what marks an item shipped.',
+      'SHIPMENT_REQUIRED',
+    )
+  }
 
   const order = await queryOne(
-    'SELECT o.id, o.buyer_id, o.public_id, o.order_number, o.payment_method, o.payment_status FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE oi.id = ?',
+    `SELECT o.id, o.buyer_id, o.public_id, o.order_number, o.payment_method, o.payment_status,
+            o.currency_code
+       FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE oi.id = ?`,
     [orderItemId],
   )
+
+  await withTransaction(async (connection) => {
+    /**
+     * Real fulfilment timestamps.
+     *
+     * `updated_at` cannot answer "was this dispatched on time" because the next edit
+     * overwrites it, so on-time-dispatch rate — the metric seller performance is actually
+     * judged on — was previously uncomputable.
+     */
+    const stamps = {
+      confirmed: 'confirmed_at = COALESCE(confirmed_at, NOW(3))',
+      shipped: 'shipped_at = COALESCE(shipped_at, NOW(3))',
+      delivered: 'delivered_at = COALESCE(delivered_at, NOW(3))',
+    }[status]
+
+    await connection.execute(
+      `UPDATE order_items
+          SET status = ?,
+              ${stamps ? `${stamps},` : ''}
+              ${status === 'cancelled' ? "cancelled_by = 'seller', cancelled_reason = ?, cancelled_at = NOW(3)," : ''}
+              updated_at = NOW(3)
+        WHERE id = ?`,
+      status === 'cancelled'
+        ? [status, reason ?? null, orderItemId]
+        : [status, orderItemId],
+    )
+
+    await recordOrderEvent(connection, {
+      orderId: order.id,
+      orderItemId,
+      eventType: `item.${status}`,
+      fromStatus: item.status,
+      toStatus: status,
+      actorSide: 'seller',
+      note: reason ?? null,
+    })
+
+    /**
+     * Delivery is the earning event.
+     *
+     * Posted here, inside the same transaction as the status change, so a delivered item and
+     * the money it earns cannot disagree. `uq_seller_ledger_sale_once` makes a repeat harmless,
+     * which matters because this path is reachable from a retry.
+     */
+    if (status === 'delivered') {
+      await postSaleEarning(connection, {
+        sellerId,
+        orderItemId,
+        orderId: order.id,
+        lineTotal: item.line_total,
+        discountAmount: item.discount_amount,
+        discountFundedBy: item.discount_funded_by,
+        currencyCode: order.currency_code,
+      })
+    }
+  })
+
+  const updated = await queryOne(`${ORDER_ITEM_SELECT} WHERE oi.id = ?`, [orderItemId])
 
   // Cash on Delivery is settled by the courier at the door, so delivery IS the payment event
   // — nothing else would ever mark a COD order paid. Applied once every item that is still
@@ -463,16 +704,19 @@ export async function updateOrderItemStatusForSeller(sellerId, orderItemId, stat
   if (status === 'delivered' && order.payment_method === 'cod' && order.payment_status !== 'paid') {
     const outstanding = await queryOne(
       `SELECT COUNT(*) AS count FROM order_items
-        WHERE order_id = ? AND status NOT IN ('delivered', 'cancelled', 'returned')`,
+        WHERE order_id = ? AND status NOT IN ('delivered', 'cancelled', 'returned', 'failed_delivery')`,
       [order.id],
     )
     if (Number(outstanding.count) === 0) {
       await query("UPDATE orders SET payment_status = 'paid', paid_at = NOW(3) WHERE id = ?", [order.id])
     }
   }
+
+  await syncOrderStatus(order.id)
+
   await createNotification(order.buyer_id, {
     type: 'order_status_changed',
-    title: `Order ${order.order_number} is now ${status}`,
+    title: `Order ${order.order_number} is now ${status.replace('_', ' ')}`,
     body: `${updated.product_name} — ${STATUS_NOTIFICATION_COPY[status] ?? `status updated to ${status}`}`,
     link: `/order-success/${order.public_id}`,
   })
@@ -480,9 +724,53 @@ export async function updateOrderItemStatusForSeller(sellerId, orderItemId, stat
   return shapeOrderItem(updated)
 }
 
-async function findOwnedOrderItem(buyerId, orderItemId) {
+/**
+ * Recompute the order-level status from its items.
+ *
+ * A multi-seller order has no single status of its own — it is a summary of its lines, and the
+ * summary previously had no way to say "one of three sellers cancelled". `partially_cancelled`
+ * is that missing state: calling the whole order cancelled would tell the buyer their other
+ * two items were not coming, which is untrue.
+ */
+async function syncOrderStatus(orderId) {
+  const [counts] = await query(
+    `SELECT COUNT(*) AS total,
+            SUM(status = 'delivered') AS delivered,
+            SUM(status = 'cancelled') AS cancelled,
+            SUM(status = 'returned') AS returned,
+            SUM(status = 'failed_delivery') AS failed,
+            SUM(status = 'shipped') AS shipped,
+            SUM(status IN ('confirmed','processing')) AS in_progress
+       FROM order_items WHERE order_id = ?`,
+    [orderId],
+  )
+
+  const total = Number(counts.total)
+  if (total === 0) return
+
+  const delivered = Number(counts.delivered ?? 0)
+  const cancelled = Number(counts.cancelled ?? 0)
+  const returned = Number(counts.returned ?? 0)
+  const failed = Number(counts.failed ?? 0)
+  const shipped = Number(counts.shipped ?? 0)
+  const inProgress = Number(counts.in_progress ?? 0)
+
+  const status = cancelled === total ? 'cancelled'
+    : returned === total ? 'returned'
+      : delivered + cancelled + returned === total && delivered > 0
+        ? (cancelled > 0 ? 'partially_cancelled' : 'delivered')
+        : failed > 0 && shipped === 0 && inProgress === 0 ? 'failed_delivery'
+          : shipped > 0 ? 'shipped'
+            : inProgress > 0 ? 'processing'
+              : 'pending'
+
+  await query('UPDATE orders SET status = ?, updated_at = NOW(3) WHERE id = ?', [status, orderId])
+}
+
+/** Exported for the returns module, which needs the same ownership check. */
+export async function findOwnedOrderItem(buyerId, orderItemId) {
   const item = await queryOne(
-    `SELECT oi.*, o.buyer_id FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE oi.id = ?`,
+    `SELECT oi.*, o.buyer_id, o.order_number FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE oi.id = ?`,
     [orderItemId],
   )
   if (!item) throw notFound('Order item not found.', 'ORDER_ITEM_NOT_FOUND')
@@ -490,158 +778,19 @@ async function findOwnedOrderItem(buyerId, orderItemId) {
   return item
 }
 
-/**
- * A buyer cancelling their own item before it ships — no seller review needed, unlike a
- * return. Restocks the inventory that checkout reserved, symmetric with how `createOrder`
- * decremented it.
+/*
+ * Buyer cancellation moved to `cancellation.service.js`.
+ *
+ * What was here could only void a whole line, and only for a buyer. It could not cancel two of
+ * three, no seller or operator could cancel at all, and it never refunded anything — a paid
+ * order that was cancelled simply kept the buyer's money with nothing recording the debt.
  */
-export async function cancelOrderItemForBuyer(buyerId, orderItemId) {
-  const item = await findOwnedOrderItem(buyerId, orderItemId)
-  if (!['pending', 'confirmed', 'processing'].includes(item.status)) {
-    throw conflict(`This item is already ${item.status} and can no longer be cancelled.`, 'CANNOT_CANCEL')
-  }
-  await withTransaction(async (connection) => {
-    await connection.execute('UPDATE order_items SET status = ?, updated_at = ? WHERE id = ?', ['cancelled', toSqlDateTime(), orderItemId])
-    await connection.execute('UPDATE inventory SET quantity = quantity + ? WHERE variant_id = ?', [item.quantity, item.variant_id])
-  })
-  const cancelled = await queryOne(`${ORDER_ITEM_SELECT} WHERE oi.id = ?`, [orderItemId])
-
-  const seller = await queryOne('SELECT user_id FROM sellers WHERE id = ?', [item.seller_id])
-  await createNotification(seller.user_id, {
-    type: 'item_cancelled',
-    title: `Order ${cancelled.order_number} — item cancelled`,
-    body: `The buyer cancelled ${cancelled.product_name} before it shipped.`,
-    link: '/seller-center/orders',
-  })
-
-  return shapeOrderItem(cancelled)
-}
-
-/** File a return request on a delivered item. Only one request is ever allowed per item —
- * see the unique index in migration 005. */
-export async function createReturnRequestForBuyer(buyerId, orderItemId, { reason, description }) {
-  const item = await findOwnedOrderItem(buyerId, orderItemId)
-  if (item.status !== 'delivered') {
-    throw conflict('Only a delivered item can be returned.', 'ITEM_NOT_DELIVERED')
-  }
-  const existing = await queryOne('SELECT id FROM return_requests WHERE order_item_id = ?', [orderItemId])
-  if (existing) throw conflict('A return request already exists for this item.', 'RETURN_ALREADY_REQUESTED')
-
-  const publicId = randomUUID()
-  await query(
-    `INSERT INTO return_requests (public_id, order_item_id, buyer_id, seller_id, reason, description)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [publicId, orderItemId, buyerId, item.seller_id, reason, description ?? ''],
-  )
-  const updated = await queryOne(`${ORDER_ITEM_SELECT} WHERE oi.id = ?`, [orderItemId])
-
-  const seller = await queryOne('SELECT user_id FROM sellers WHERE id = ?', [item.seller_id])
-  await createNotification(seller.user_id, {
-    type: 'return_requested',
-    title: `Return requested — order ${updated.order_number}`,
-    body: `${updated.product_name}: "${reason}"`,
-    link: '/seller-center/orders/returns',
-  })
-
-  return shapeOrderItem(updated)
-}
-
-function shapeReturnRequest(row) {
-  return {
-    id: row.public_id,
-    reason: row.reason,
-    description: row.description,
-    status: row.status,
-    resolutionNote: row.resolution_note,
-    createdAt: row.created_at,
-    orderNumber: row.order_number,
-    product: { id: row.product_public_id, name: row.product_name },
-    quantity: row.quantity,
-    lineTotal: formatMoney(row.line_total, row.currency_code),
-    buyer: { name: row.buyer_name },
-  }
-}
-
-/** A seller's own return-request review queue. */
-export async function listReturnRequestsForSeller(sellerId) {
-  const rows = await query(
-    `SELECT r.*, oi.product_id, oi.quantity, oi.line_total, oi.variant_id,
-            o.order_number, o.currency_code,
-            p.public_id AS product_public_id, p.name AS product_name,
-            u.full_name AS buyer_name
-       FROM return_requests r
-       JOIN order_items oi ON oi.id = r.order_item_id
-       JOIN orders o ON o.id = oi.order_id
-       JOIN products p ON p.id = oi.product_id
-       JOIN users u ON u.id = r.buyer_id
-      WHERE r.seller_id = ?
-      ORDER BY r.created_at DESC`,
-    [sellerId],
-  )
-  return rows.map(shapeReturnRequest)
-}
-
-/**
- * Approve or reject a return request — only the seller it belongs to may resolve it, and
- * only once (a resolved request cannot be re-resolved). Approval restocks the returned
- * quantity and marks the order item 'returned'; rejection leaves the item exactly as it was.
+/*
+ * The return lifecycle moved to `returns.service.js`.
+ *
+ * What was here handled three states and one actor: the seller decided a return filed against
+ * their own store, and there was no appeal. It also refused a second request whenever any row
+ * existed for the item, so a rejection permanently consumed the buyer's only attempt — which
+ * migration 021 had already replaced with a "one *open* request per item" index that nothing
+ * read. `findOwnedOrderItem` above is exported for the new module; nothing else here is needed.
  */
-export async function resolveReturnRequestForSeller(sellerId, returnRequestId, { status, resolutionNote }) {
-  const request = await queryOne(
-    `SELECT r.*, oi.variant_id, oi.quantity, oi.line_total, oi.order_id
-       FROM return_requests r
-       JOIN order_items oi ON oi.id = r.order_item_id
-      WHERE r.public_id = ?`,
-    [returnRequestId],
-  )
-  if (!request) throw notFound('Return request not found.', 'RETURN_NOT_FOUND')
-  if (request.seller_id !== sellerId) throw forbidden('This return request does not belong to your store.')
-  if (request.status !== 'requested') throw conflict('This return request has already been resolved.', 'RETURN_ALREADY_RESOLVED')
-
-  let refundId = null
-  await withTransaction(async (connection) => {
-    await connection.execute(
-      'UPDATE return_requests SET status = ?, resolution_note = ?, resolved_at = ? WHERE id = ?',
-      [status, resolutionNote ?? '', toSqlDateTime(), request.id],
-    )
-    if (status === 'approved') {
-      await connection.execute('UPDATE order_items SET status = ?, updated_at = ? WHERE id = ?', ['returned', toSqlDateTime(), request.order_item_id])
-      await connection.execute('UPDATE inventory SET quantity = quantity + ? WHERE variant_id = ?', [request.quantity, request.variant_id])
-      // Recorded inside the transaction so an approved return can never end up with no
-      // refund owed; the gateway call itself happens after commit, below.
-      refundId = await createRefundForReturn(connection, {
-        returnRequestId: request.id,
-        orderId: request.order_id,
-        amount: request.line_total,
-      })
-    }
-  })
-
-  // Deliberately outside the transaction: an external API call must not hold a database
-  // transaction open, and a gateway failure here leaves a retryable 'pending' refund rather
-  // than rolling back the return approval itself.
-  if (refundId) await processRefund(refundId)
-
-  const resolved = shapeReturnRequest(await queryOne(
-    `SELECT r.*, oi.product_id, oi.quantity, oi.line_total, oi.variant_id,
-            o.order_number, o.currency_code,
-            p.public_id AS product_public_id, p.name AS product_name,
-            u.full_name AS buyer_name
-       FROM return_requests r
-       JOIN order_items oi ON oi.id = r.order_item_id
-       JOIN orders o ON o.id = oi.order_id
-       JOIN products p ON p.id = oi.product_id
-       JOIN users u ON u.id = r.buyer_id
-      WHERE r.id = ?`,
-    [request.id],
-  ))
-
-  await createNotification(request.buyer_id, {
-    type: 'return_resolved',
-    title: `Return ${status} — order ${resolved.orderNumber}`,
-    body: `${resolved.product.name}${resolutionNote ? `: ${resolutionNote}` : ''}`,
-    link: '/orders',
-  })
-
-  return resolved
-}

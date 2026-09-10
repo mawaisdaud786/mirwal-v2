@@ -27,6 +27,9 @@ if (env.isProduction) {
 }
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../../..')
+
+/** Matches DEFAULT_COMMISSION_BPS in payouts.service.js — 10%. */
+const COMMISSION_BPS = 1000
 const slugify = (value) => value.toLowerCase()
   .replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 
@@ -93,13 +96,37 @@ async function run() {
   for (const store of DEV_STORES) {
     const [result] = await pool.execute(
       `INSERT INTO sellers (public_id, user_id, slug, store_name, description, city,
-                            status, approved_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'approved', CURRENT_TIMESTAMP(3))`,
+                            seller_type, verification_level, verified_badge,
+                            status, applied_at, approved_at, verified_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'individual', 'identity_verified', 1,
+               'approved', CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3))`,
       [randomUUID(), userIds.get(store.email), store.slug, store.name, store.description, store.city],
     )
     sellerIds.set(store.slug, result.insertId)
+
+    /**
+     * A verified payout destination.
+     *
+     * Since migration 020 a seller cannot request a withdrawal without one — which is the
+     * point, since `payouts.destination_hint` was previously free text typed by staff. A dev
+     * store with no payout account is therefore not a realistic approved seller, and would
+     * make every finance screen untestable.
+     *
+     * The IBAN is structurally valid and deliberately not a real account.
+     */
+    await pool.execute(
+      `INSERT INTO seller_bank_accounts
+         (public_id, seller_id, method, account_title, bank_name, iban, last4,
+          status, is_default, verified_at)
+       VALUES (?, ?, 'bank', ?, 'Development Bank', ?, ?, 'verified', 1, CURRENT_TIMESTAMP(3))`,
+      [
+        randomUUID(), result.insertId, store.name,
+        `PK36DEVB${String(result.insertId).padStart(16, '0')}`,
+        String(result.insertId).padStart(4, '0'),
+      ],
+    )
   }
-  console.log(`  sellers      ${sellerIds.size}`)
+  console.log(`  sellers      ${sellerIds.size} (each with a verified payout account)`)
 
   // --- catalogue ------------------------------------------------------------
   const { products: seedProducts, categories: seedCategories } =
@@ -298,6 +325,36 @@ async function seedReviews() {
         `INSERT INTO product_reviews (public_id, product_id, user_id, order_item_id, rating, title, body)
          VALUES (?, ?, ?, ?, ?, '', ?)`,
         [randomUUID(), product.id, buyer.id, item.insertId, rating, BODIES[index % BODIES.length]],
+      )
+
+      /**
+       * The ledger entries a delivered item produces.
+       *
+       * Since migration 021 a seller's balance is the sum of their ledger rows, not a query
+       * over delivered order items. A seeded order that skipped this would leave the dev
+       * database with delivered sales and a zero balance — which is not a state production can
+       * reach, so it would make the seller finance screens untestable.
+       *
+       * Immediately available rather than held: seed data exists to be worked with, and a
+       * seven-day hold on every seeded order would leave a fresh developer database with
+       * nothing withdrawable.
+       */
+      const commission = Math.round(Number(product.price) * COMMISSION_BPS) / 10000
+      await connection.execute(
+        `INSERT INTO seller_ledger_entries
+           (public_id, seller_id, entry_type, amount, order_item_id, order_id, description)
+         VALUES (?, ?, 'sale', ?, ?, ?, 'Delivered order item')`,
+        [randomUUID(), product.seller_id, Number(product.price).toFixed(2), item.insertId, order.insertId],
+      )
+      await connection.execute(
+        `INSERT INTO seller_ledger_entries
+           (public_id, seller_id, entry_type, amount, order_item_id, order_id, description)
+         VALUES (?, ?, 'commission', ?, ?, ?, 'Marketplace commission')`,
+        [randomUUID(), product.seller_id, (-commission).toFixed(2), item.insertId, order.insertId],
+      )
+      await connection.execute(
+        'UPDATE order_items SET commission_amount = ?, delivered_at = NOW(3) WHERE id = ?',
+        [commission.toFixed(2), item.insertId],
       )
     })
     reviews += 1

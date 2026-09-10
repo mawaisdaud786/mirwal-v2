@@ -26,6 +26,9 @@ const mapReturn = (row) => ({
   id: row.public_id,
   orderNumber: row.order_number,
   orderId: row.order_public_id,
+  // Ids alongside the names: a return row is a question about a listing and about a buyer,
+  // and both used to be dead strings.
+  productId: row.product_public_id ?? null,
   productName: row.product_name,
   sku: row.sku,
   quantity: Number(row.quantity),
@@ -34,7 +37,7 @@ const mapReturn = (row) => ({
   description: row.description,
   status: row.status,
   resolutionNote: row.resolution_note,
-  buyer: { name: row.buyer_name, email: row.buyer_email },
+  buyer: { id: row.buyer_public_id ?? null, name: row.buyer_name, email: row.buyer_email },
   seller: { id: row.seller_public_id, name: row.store_name },
   refund: row.refund_public_id
     ? {
@@ -53,7 +56,8 @@ const RETURN_SELECT = `
          r.created_at, r.resolved_at,
          o.order_number, o.public_id AS order_public_id, o.currency_code,
          oi.product_name, oi.sku, oi.quantity, oi.line_total,
-         buyer.full_name AS buyer_name, buyer.email AS buyer_email,
+         prod.public_id AS product_public_id,
+         buyer.public_id AS buyer_public_id, buyer.full_name AS buyer_name, buyer.email AS buyer_email,
          s.public_id AS seller_public_id, s.store_name,
          f.public_id AS refund_public_id, f.status AS refund_status,
          f.amount AS refund_amount, f.provider AS refund_provider
@@ -62,6 +66,8 @@ const RETURN_SELECT = `
     JOIN orders o       ON o.id = oi.order_id
     JOIN users buyer    ON buyer.id = r.buyer_id
     JOIN sellers s      ON s.id = r.seller_id
+    -- LEFT, not JOIN: a deleted listing must not make its return vanish from the queue.
+    LEFT JOIN products prod ON prod.id = oi.product_id
     LEFT JOIN refunds f ON f.return_request_id = r.id`
 
 export async function listReturns({ page = 1, pageSize = 50, status } = {}) {
@@ -116,7 +122,7 @@ const mapRefund = (row) => ({
   providerRef: row.provider_ref || null,
   status: row.status,
   failureReason: row.failure_reason || null,
-  buyer: { name: row.buyer_name, email: row.buyer_email },
+  buyer: { id: row.buyer_public_id ?? null, name: row.buyer_name, email: row.buyer_email },
   returnId: row.return_public_id ?? null,
   settledBy: row.settled_by_name ?? null,
   settledAt: row.settled_at,
@@ -127,7 +133,7 @@ const REFUND_SELECT = `
   SELECT f.public_id, f.amount, f.currency_code, f.provider, f.provider_ref, f.status,
          f.failure_reason, f.settled_at, f.created_at,
          o.order_number, o.public_id AS order_public_id,
-         buyer.full_name AS buyer_name, buyer.email AS buyer_email,
+         buyer.public_id AS buyer_public_id, buyer.full_name AS buyer_name, buyer.email AS buyer_email,
          r.public_id AS return_public_id,
          settler.full_name AS settled_by_name
     FROM refunds f
@@ -223,7 +229,7 @@ export async function settleRefund(publicId, { status, reference, note }, userId
 
   if (status === 'succeeded') {
     // Never throws; a mail outage must not roll back a refund that has actually been paid.
-    await messaging.send('order.refunded', {
+    messaging.sendInBackground('order.refunded', {
       channel: 'email',
       to: refund.buyer_email,
       variables: {

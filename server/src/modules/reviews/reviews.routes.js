@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { validate } from '../../middleware/validate.js'
 import { requireAuth } from '../../middleware/auth.js'
+import { writeLimiter } from '../../middleware/rateLimit.js'
 import { productSlugSchema, createReviewSchema } from './reviews.schemas.js'
 import * as controller from './reviews.controller.js'
 
@@ -13,4 +14,4 @@ export const reviewsRouter = Router()
 
 reviewsRouter.get('/product/:slug', validate(productSlugSchema, 'params'), controller.listForProduct)
 reviewsRouter.get('/mine/pending', requireAuth, controller.listReviewable)
-reviewsRouter.post('/', requireAuth, validate(createReviewSchema), controller.create)
+reviewsRouter.post('/', requireAuth, writeLimiter, validate(createReviewSchema), controller.create)

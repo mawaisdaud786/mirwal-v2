@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { query, queryOne, withTransaction } from '../../db/pool.js'
-import { badRequest, conflict, forbidden, notFound } from '../../lib/errors.js'
+import { badRequest, conflict, notFound } from '../../lib/errors.js'
 import { getNumericSetting, getSetting } from '../settings/settings.service.js'
 import { createNotification } from '../notifications/notifications.service.js'
 import * as messaging from '../messaging/messaging.service.js'
@@ -246,7 +246,7 @@ export async function submitApplication(userId, input, { ip = null, userAgent = 
     body: 'Mirwal is reviewing your seller application. We will email you when there is a decision.',
     link: '/sell-with-mirwal/status',
   })
-  await messaging.send('seller.application_received', {
+  messaging.sendInBackground('seller.application_received', {
     to: input.applicantEmail,
     userId,
     variables: { sellerName: input.applicantName, storeName: input.storeName },
@@ -533,7 +533,7 @@ export async function requestMoreInformation(publicId, { message, code }, review
     body: message.slice(0, 480),
     link: '/sell-with-mirwal/status',
   })
-  await messaging.send('seller.application_more_info', {
+  messaging.sendInBackground('seller.application_more_info', {
     to: row.applicant_email,
     userId: row.user_id,
     variables: { sellerName: row.applicant_name, storeName: row.store_name, message },
@@ -603,7 +603,7 @@ export async function approveApplication(publicId, reviewerId, { note } = {}) {
     body: `${row.store_name} has been approved. Sign in to the seller panel to add your first product.`,
     link: '/sell-with-mirwal/status',
   })
-  await messaging.send('seller.approved', {
+  messaging.sendInBackground('seller.approved', {
     to: row.applicant_email,
     userId: row.user_id,
     variables: { sellerName: row.applicant_name, storeName: row.store_name },
@@ -639,7 +639,7 @@ export async function rejectApplication(publicId, { code, note }, reviewerId) {
     body: reason.slice(0, 480),
     link: '/sell-with-mirwal/status',
   })
-  await messaging.send('seller.rejected', {
+  messaging.sendInBackground('seller.rejected', {
     to: row.applicant_email,
     userId: row.user_id,
     variables: { sellerName: row.applicant_name, storeName: row.store_name, reason },

@@ -1,6 +1,6 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { startTestServer, apiFetch, registerTestUser, loginAs } from './setup.js'
+import { startTestServer, apiFetch, registerTestUser, loginAs, shipItem } from './setup.js'
 import { queryOne, closePool } from '../src/db/pool.js'
 
 /**
@@ -55,6 +55,8 @@ async function deliveredOrder() {
   const orderItemId = created.body.data.items[0].id
 
   for (const status of ['confirmed', 'processing', 'shipped', 'delivered']) {
+    // See setup.js: 'shipped' is what a shipment means, so it is created rather than asserted.
+    if (status === 'shipped') { await shipItem(server.baseUrl, sellerBToken, orderItemId, apiFetch); continue }
     const result = await apiFetch(server.baseUrl, `/seller/me/orders/${orderItemId}/status`, {
       method: 'PATCH', token: sellerBToken, body: { status },
     })
@@ -74,19 +76,27 @@ test('approving a return on a paid COD order creates a manual refund the seller 
   const { order, orderItemId } = await deliveredOrder()
 
   const requested = await apiFetch(server.baseUrl, `/orders/items/${orderItemId}/return-request`, {
-    method: 'POST', token: buyer.accessToken, body: { reason: 'Item damaged or defective' },
+    method: 'POST', token: buyer.accessToken, body: { reason: 'damaged', description: 'Item damaged or defective.' },
   })
   assert.equal(requested.status, 201)
-  const returnRequestId = requested.body.data.returnRequest.id
+  const returnRequestId = requested.body.data.id
 
+  // Approval no longer creates the refund. It used to, which meant an approved return whose
+  // parcel never arrived had already restocked the item and already owed the money. The refund
+  // is now owed when the return is actually settled.
   const approved = await apiFetch(server.baseUrl, `/seller/me/returns/${returnRequestId}/status`, {
     method: 'PATCH', token: sellerBToken, body: { status: 'approved' },
   })
-  assert.equal(approved.status, 200)
+  assert.equal(approved.status, 200, JSON.stringify(approved.body))
+
+  const settledReturn = await apiFetch(server.baseUrl, `/seller/me/returns/${returnRequestId}/status`, {
+    method: 'PATCH', token: sellerBToken, body: { status: 'refunded' },
+  })
+  assert.equal(settledReturn.status, 200, JSON.stringify(settledReturn.body))
 
   const queue = await apiFetch(server.baseUrl, '/seller/me/refunds', { token: sellerBToken })
   const refund = queue.body.data.find((entry) => entry.orderNumber === order.orderNumber)
-  assert.ok(refund, 'an approved return on a paid order must owe a refund')
+  assert.ok(refund, 'a settled return on a paid order must owe a refund')
   assert.equal(refund.status, 'manual_required')
   assert.equal(refund.provider, 'cod')
   // The instruction must actually tell a human what to do, not just name a state.

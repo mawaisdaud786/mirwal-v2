@@ -1,4 +1,5 @@
-import { ok } from '../../lib/errors.js'
+import { z } from 'zod'
+import { ok, okPage } from '../../lib/errors.js'
 import * as service from './products.service.js'
 
 /**
@@ -66,4 +67,29 @@ export async function updateInventory(req, res, next) {
     await service.updateVariantInventory(req.seller.id, req.params.id, req.body)
     return ok(res, null, 'Stock updated.')
   } catch (error) { return next(error) }
+}
+
+/**
+ * Filters for a seller's own catalogue. Kept here rather than in a schemas file because these
+ * three are the only query this endpoint takes.
+ */
+export const listProductsSchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).optional().default(25),
+  status: z.enum(['draft', 'pending_review', 'active', 'rejected', 'delisted', 'archived']).optional(),
+  search: z.string().trim().max(120).optional(),
+})
+
+export async function listProducts(req, res, next) {
+  try {
+    const { page, pageSize, status, search } = req.validatedQuery ?? {}
+    const result = await service.listForSeller(req.seller.id, { page, pageSize, status, search })
+    return okPage(res, result.items, { page, pageSize, total: result.total })
+  } catch (error) { return next(error) }
+}
+
+/** Counts across the whole store, so the tabs do not describe only the page being shown. */
+export async function productStatusCounts(req, res, next) {
+  try { return ok(res, await service.statusCountsForSeller(req.seller.id)) }
+  catch (error) { return next(error) }
 }

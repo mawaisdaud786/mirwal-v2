@@ -32,6 +32,10 @@ export const AUDIT = {
   BRAND_UPDATED: 'brand.updated',
   BRAND_DELETED: 'brand.deleted',
   INVENTORY_UPDATED: 'inventory.updated',
+  // Post-purchase actions Mirwal takes on someone else's order. Both spend money or reputation
+  // on a buyer's or seller's behalf, so both are attributable.
+  ORDER_ITEM_CANCELLED: 'order.item_cancelled',
+  REFUND_ISSUED: 'order.refund_issued',
   SELLER_APPROVED: 'seller.approved',
   SELLER_REJECTED: 'seller.rejected',
   SELLER_SUSPENDED: 'seller.suspended',
@@ -121,6 +125,9 @@ export const AUDIT = {
   CASE_RESOLVED: 'case.resolved',
   REVIEW_MODERATED: 'review.moderated',
   RETURN_OVERRIDDEN: 'return.overridden',
+  // Distinct from OVERRIDDEN: an adjudication may equally let the seller's decision stand,
+  // and "overridden" would be a lie in half the cases.
+  RETURN_ADJUDICATED: 'return.adjudicated',
   BRAND_AUTHORIZED: 'brand.authorized',
   BRAND_AUTHORIZATION_REVOKED: 'brand.authorization_revoked',
 }

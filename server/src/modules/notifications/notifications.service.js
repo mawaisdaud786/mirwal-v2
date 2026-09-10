@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { pool, query, queryOne } from '../../db/pool.js'
 import { forbidden, notFound } from '../../lib/errors.js'
+import { mayNotify } from './preferences.service.js'
 
 /**
  * In-app notifications. There is no email/SMS provider integrated, so this is deliberately
@@ -12,8 +13,14 @@ import { forbidden, notFound } from '../../lib/errors.js'
  * atomically alongside the event that caused it (e.g. a notification for a new order is
  * written inside the same transaction that creates the order) — either both commit or
  * neither does.
+ *
+ * Preferences are honoured here too, but only for whole categories a person has switched off.
+ * The in-app list is the record of what happened rather than an interruption, so switching a
+ * category off is mostly about not being emailed or texted; a category genuinely turned off
+ * stops appearing at all, because otherwise the setting means nothing on this surface.
  */
 export async function createNotification(userId, { type, title, body = '', link = null }, connection = null) {
+  if (!(await mayNotify(userId, type, 'inApp'))) return
   const executor = connection ?? pool
   await executor.execute(
     'INSERT INTO notifications (public_id, user_id, type, title, body, link) VALUES (?, ?, ?, ?, ?, ?)',
