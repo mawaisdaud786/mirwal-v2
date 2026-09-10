@@ -63,18 +63,23 @@ test('the counts are real, not a placeholder', async () => {
 })
 
 test('the overdue count follows the service level, not the total', async () => {
-  const before = await apiFetch(server.baseUrl, '/admin/work-queue', { token: adminToken })
-  const wasOverdue = before.body.data.queues.find((queue) => queue.key === 'products').overdue
-
-  // Push one pending listing past its 24-hour service level and put it back afterwards, so the
-  // dev database is left as it was found.
+  // Pick a pending listing and put it demonstrably inside its service level before reading the
+  // baseline. Reading the baseline first and assuming the chosen row was still fresh only held
+  // while the seed was new: once the seeded rows age past 24 hours every pending listing is
+  // already late, so pushing this one further changes nothing and the count never moves. The
+  // test then failed on the calendar rather than on the behaviour it describes.
   const [target] = await query(
     "SELECT id, updated_at FROM products WHERE status = 'pending_review' AND deleted_at IS NULL LIMIT 1",
   )
   if (!target) return
 
-  await query('UPDATE products SET updated_at = NOW() - INTERVAL 40 HOUR WHERE id = ?', [target.id])
+  // Restored in the finally, so the dev database is left as it was found.
   try {
+    await query('UPDATE products SET updated_at = NOW() WHERE id = ?', [target.id])
+    const before = await apiFetch(server.baseUrl, '/admin/work-queue', { token: adminToken })
+    const wasOverdue = before.body.data.queues.find((queue) => queue.key === 'products').overdue
+
+    await query('UPDATE products SET updated_at = NOW() - INTERVAL 40 HOUR WHERE id = ?', [target.id])
     const after = await apiFetch(server.baseUrl, '/admin/work-queue', { token: adminToken })
     const queue = after.body.data.queues.find((entry) => entry.key === 'products')
     assert.equal(queue.overdue, wasOverdue + 1, 'a listing past its SLA must be counted as late')
