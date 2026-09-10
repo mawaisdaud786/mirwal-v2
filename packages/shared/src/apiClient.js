@@ -71,17 +71,27 @@ async function raw(path, { method = 'GET', body, signal, headers = {}, auth = tr
     throw new ApiError('API_NOT_CONFIGURED', 'The Mirwal API is not configured.', 0)
   }
 
+  /**
+   * A file upload is sent as-is.
+   *
+   * `FormData` must reach fetch untouched: JSON.stringify would turn it into "[object
+   * FormData]", and setting Content-Type by hand strips the multipart boundary the browser
+   * generates, which makes the body unparseable at the other end. Both failures look like a
+   * server bug rather than a client one, so this is worth an explicit branch.
+   */
+  const isMultipart = typeof FormData !== 'undefined' && body instanceof FormData
+
   const response = await fetch(`${BASE_URL}${path}`, {
     method,
     signal,
     // Sends and receives the httpOnly refresh cookie.
     credentials: 'include',
     headers: {
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
+      ...(body && !isMultipart ? { 'Content-Type': 'application/json' } : {}),
       ...(auth && accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...headers,
     },
-    ...(body ? { body: JSON.stringify(body) } : {}),
+    ...(body ? { body: isMultipart ? body : JSON.stringify(body) } : {}),
   })
 
   const payload = await parse(response)
