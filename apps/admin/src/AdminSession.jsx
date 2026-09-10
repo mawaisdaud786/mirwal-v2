@@ -40,8 +40,25 @@ export function AdminSessionProvider({ children }) {
     setUser(null)
   }, [])
 
+
+  /**
+   * May the signed-in operator do this?
+   *
+   * Any-of, matching `requirePermission(...permissions)` on the server so a button and the
+   * route behind it can never disagree about who is allowed.
+   *
+   * This is presentation, not protection. Hiding a control the server would refuse spares
+   * someone a pointless error; showing one it would allow is the only real failure mode. Every
+   * endpoint enforces the same permission independently, so a forged `user` object in the
+   * browser buys nothing.
+   */
+  const can = useCallback(
+    (...permissions) => permissions.some((permission) => user?.permissions?.includes(permission)),
+    [user],
+  )
+
   return (
-    <AdminSessionContext.Provider value={{ user, isLoading, login, logout }}>
+    <AdminSessionContext.Provider value={{ user, isLoading, login, logout, can }}>
       {children}
     </AdminSessionContext.Provider>
   )

@@ -1,13 +1,15 @@
 import { useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import AdminLayout from './AdminLayout'
-import { Heading, Table, Filters } from './AdminComponents'
+import { Heading, Table } from './AdminComponents'
 import { EmptyState, LoadingState, ErrorState } from './AdminStates'
 import { useApiQuery, describeApiError } from '@mirwal/shared/useApiQuery'
+import { Pagination } from './AdminComponents'
 import api from '../api'
 import { navigateTo } from '@mirwal/shared/navigation'
 import Icon from '@mirwal/shared/Icon'
 import './order-pages.css'
+import AdminOrderIntervention from './AdminOrderIntervention'
 
 /**
  * Orders, Order Details and Disputes, backed by `server/src/modules/admin`. Disputes reads the
@@ -33,67 +35,149 @@ const STATUS_LABEL = { pending: 'Pending', confirmed: 'Confirmed', processing: '
 const STATUS_CLASS = { pending: 'processing', confirmed: 'processing' }
 function Status({ value }) { return <span className={`order-status ${STATUS_CLASS[value] ?? value}`}>{STATUS_LABEL[value] ?? value}</span> }
 
+/** The rolled-up item status, which is what an operator scanning this list actually means. */
+const ORDER_TABS = [
+  ['', 'All'],
+  ['processing', 'Processing'],
+  ['shipped', 'Shipped'],
+  ['delivered', 'Delivered'],
+  ['cancelled', 'Cancelled'],
+]
+
 function AdminOrdersList() {
   const [search, setSearch] = useState('')
-  const { data: orders, error, isLoading, refetch } = useApiQuery((signal) => api.admin.orders.list(signal), [])
+  const [status, setStatus] = useState('')
+  const [paymentStatus, setPaymentStatus] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
 
-  const idByOrderNumber = useMemo(() => new Map((orders ?? []).map((order) => [order.orderNumber, order.id])), [orders])
+  /**
+   * The list is paged and filtered by the server.
+   *
+   * `GET /admin/orders` used to return every order on the marketplace in one response, and the
+   * search box filtered that array in the browser — fine at seven hundred orders, untenable at
+   * seventy thousand, and the reason there was no way to reach anything past what had arrived.
+   */
+  const { data, error, isLoading, refetch } = useApiQuery(
+    (signal) => api.admin.orders.list(
+      {
+        page, pageSize,
+        ...(search.trim() ? { search: search.trim() } : {}),
+        ...(status ? { status } : {}),
+        ...(paymentStatus ? { paymentStatus } : {}),
+      },
+      signal,
+    ),
+    [page, pageSize, search, status, paymentStatus],
+  )
+  const counts = useApiQuery((signal) => api.admin.orders.counts(signal), [])
 
-  const kpis = useMemo(() => {
-    const list = orders ?? []
-    return {
-      total: list.length,
-      processing: list.filter((o) => o.status === 'processing').length,
-      shipped: list.filter((o) => o.status === 'shipped').length,
-      delivered: list.filter((o) => o.status === 'delivered').length,
-    }
-  }, [orders])
+  const orders = data?.items ?? []
+  const pagination = data?.pagination ?? { page, pageSize, total: 0 }
+  const totals = counts.data ?? {}
 
-  const rows = useMemo(() => (orders ?? [])
-    .filter((order) => `${order.orderNumber} ${order.buyer.name} ${order.buyer.email}`.toLowerCase().includes(search.toLowerCase()))
-    .map((order) => [
-      order.orderNumber,
-      order.buyer.name,
-      order.itemCount,
-      order.total.display,
-      order.paymentMethod === 'cod' ? 'Cash on Delivery' : order.paymentMethod,
-      order.status,
-      new Date(order.createdAt.replace(' ', 'T') + 'Z').toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' }),
-    ]), [orders, search])
+  // Changing what is listed sends the reader back to page one; staying on page 40 of a result
+  // set that now has two shows an empty table and reads as a bug.
+  const refine = (apply) => { apply(); setPage(1) }
+
+  const rows = orders.map((order) => [
+    order.orderNumber,
+    order.buyer.name,
+    order.itemCount,
+    order.total.display,
+    order.paymentMethod === 'cod' ? 'Cash on Delivery' : order.paymentMethod,
+    order.status,
+    new Date(order.createdAt.replace(' ', 'T') + 'Z').toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' }),
+  ])
+
+  const byOrderNumber = new Map(orders.map((order) => [order.orderNumber, order]))
 
   return (
     <AdminLayout>
       <div className="order-page">
         <Heading section="order" crumb="Orders" title="All Orders" />
 
-        {!isLoading && !error && (
+        {!counts.isLoading && (
           <div className="order-kpis">
-            <article><span className="order-kpi-icon"><Icon name="bag-shopping" /></span><small>Total Orders</small><strong>{kpis.total}</strong></article>
-            <article><span className="order-kpi-icon tone-2"><Icon name="clock" /></span><small>Processing</small><strong>{kpis.processing}</strong></article>
-            <article><span className="order-kpi-icon tone-2"><Icon name="truck" /></span><small>Shipped</small><strong>{kpis.shipped}</strong></article>
-            <article><span className="order-kpi-icon tone-1"><Icon name="circle-check" /></span><small>Delivered</small><strong>{kpis.delivered}</strong></article>
+            <article><span className="order-kpi-icon"><Icon name="bag-shopping" /></span><small>Total Orders</small><strong>{totals.total ?? 0}</strong></article>
+            <article><span className="order-kpi-icon tone-2"><Icon name="clock" /></span><small>Processing</small><strong>{totals.processing ?? 0}</strong></article>
+            <article><span className="order-kpi-icon tone-2"><Icon name="truck" /></span><small>Shipped</small><strong>{totals.shipped ?? 0}</strong></article>
+            <article><span className="order-kpi-icon tone-1"><Icon name="circle-check" /></span><small>Delivered</small><strong>{totals.delivered ?? 0}</strong></article>
           </div>
         )}
 
         <section className="order-panel">
-          <Filters section="order" placeholder="Search by order number or buyer..." onSearch={setSearch} />
+          <nav className="order-status-tabs">
+            {ORDER_TABS.map(([value, label]) => (
+              <button type="button" key={value || 'all'} className={status === value ? 'active' : ''} onClick={() => refine(() => setStatus(value))}>
+                {label}
+                {value && totals[value] > 0 && <em>{totals[value]}</em>}
+              </button>
+            ))}
+          </nav>
+
+          <div className="order-filters">
+            <label>
+              <Icon name="magnifying-glass" />
+              <input
+                value={search}
+                onChange={(event) => refine(() => setSearch(event.target.value))}
+                placeholder="Search by order number, buyer name or email..."
+                aria-label="Search orders"
+              />
+            </label>
+            <select aria-label="Payment status" value={paymentStatus} onChange={(event) => refine(() => setPaymentStatus(event.target.value))}>
+              <option value="">Any payment status</option>
+              <option value="paid">Paid</option>
+              <option value="pending">Unpaid</option>
+              <option value="partially_refunded">Partly refunded</option>
+              <option value="refunded">Refunded</option>
+              <option value="failed">Failed</option>
+            </select>
+            <button type="button" onClick={() => refine(() => { setSearch(''); setStatus(''); setPaymentStatus('') })}>
+              <Icon name="rotate-left" /> Reset
+            </button>
+          </div>
 
           {isLoading && <LoadingState label="Loading orders" />}
           {error && !isLoading && <ErrorState onRetry={refetch} />}
 
           {!isLoading && !error && (
-            <Table
-              section="order"
-              headers={['Order ID', 'Buyer', 'Items', 'Total', 'Payment', 'Status', 'Date']}
-              rows={rows}
-              statusIndex={[5]}
-              StatusComponent={Status}
-              firstLink
-              linkClass="order-link"
-              onFirstClick={(row) => navigateTo(`/orders/${idByOrderNumber.get(row[0])}`)}
-              emptyIcon="bag-shopping"
-              emptyLabel="orders"
-            />
+            <>
+              <Table
+                section="order"
+                headers={['Order ID', 'Buyer', 'Items', 'Total', 'Payment', 'Status', 'Date']}
+                rows={rows}
+                statusIndex={[5]}
+                StatusComponent={Status}
+                linkClass="order-link"
+                /**
+                 * Two doors: the order, and the person who placed it. Reaching a buyer from
+                 * their order previously meant going to Customers and searching by name.
+                 */
+                links={{
+                  0: (row) => navigateTo(`/orders/${byOrderNumber.get(row[0])?.id}`),
+                  1: (row) => {
+                    const buyerId = byOrderNumber.get(row[0])?.buyer?.id
+                    if (buyerId) navigateTo(`/customers/${buyerId}`)
+                  },
+                }}
+                emptyIcon="bag-shopping"
+                emptyLabel="orders"
+                // The rows are one server page already; paging them again in the browser would
+                // page a page.
+                paginate={false}
+              />
+
+              <Pagination
+                section="order"
+                page={pagination.page}
+                pageSize={pagination.pageSize}
+                total={pagination.total}
+                onPage={setPage}
+                onPageSize={(size) => { setPageSize(size); setPage(1) }}
+              />
+            </>
           )}
         </section>
       </div>
@@ -155,6 +239,10 @@ function AdminOrderDetail() {
                 paginate={false}
               />
             </div>
+
+            {/* Cancelling for someone, refunding without a return, and reading what the two
+                parties actually said. None of it was reachable from here. */}
+            <AdminOrderIntervention order={order} onChanged={refetch} />
           </>
         )}
       </div>
@@ -200,8 +288,11 @@ function AdminDisputesList() {
         {data && <>
           <div className="order-kpis">
             <article><span className="order-kpi-icon"><Icon name="rotate-left" /></span><small>Total Disputes</small><strong>{data.summary.total}</strong></article>
-            <article><span className="order-kpi-icon tone-2"><Icon name="clock" /></span><small>Pending Review</small><strong>{data.summary.pending}</strong></article>
-            <article><span className="order-kpi-icon"><Icon name="circle-check" /></span><small>Approved</small><strong>{data.summary.approved}</strong></article>
+            {/* "Pending review" and "Approved" counted three of the ten states a return can be
+                in, so every return awaiting a photograph, in transit, received or escalated was
+                missing from the figures printed above the list it disagreed with. */}
+            <article><span className="order-kpi-icon tone-2"><Icon name="clock" /></span><small>Still Open</small><strong>{data.summary.open}</strong></article>
+            <article><span className="order-kpi-icon tone-3"><Icon name="scale-balanced" /></span><small>Escalated to Mirwal</small><strong>{data.summary.escalated}</strong></article>
             <article><span className="order-kpi-icon tone-3"><Icon name="triangle-exclamation" /></span><small>Refunds Owed</small><strong>{data.summary.refundsOwed}</strong></article>
           </div>
 

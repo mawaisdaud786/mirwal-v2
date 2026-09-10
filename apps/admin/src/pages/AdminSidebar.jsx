@@ -54,7 +54,12 @@ const groups = [
       ["All Orders", "bag-shopping", "/orders"],
       ["Returns", "rotate-left", "/returns"],
       ["Refunds", "arrow-rotate-left", "/refunds"],
+      // Two entries, deliberately. "Disputes" is the read-only overview of every return on
+      // the marketplace; "Escalated Returns" is the queue Mirwal actually decides, on its own
+      // permission, because overturning a seller moves money away from them.
       ["Disputes", "scale-balanced", "/disputes"],
+      ["Escalated Returns", "gavel", "/return-disputes"],
+      ["Trust & Safety", "shield-halved", "/cases"],
     ],
   ],
   [

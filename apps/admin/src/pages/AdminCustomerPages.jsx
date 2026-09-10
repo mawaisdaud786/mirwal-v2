@@ -38,6 +38,11 @@ function AdminCustomersList() {
       new Date(customer.lastOrderAt.replace(' ', 'T') + 'Z').toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' }),
     ]), [data, search])
 
+  const idByEmail = useMemo(
+    () => new Map((data?.customers ?? []).map((customer) => [customer.email, customer.id])),
+    [data],
+  )
+
   return <AdminLayout>
     <div className="customer-page">
       <Heading section="customer" crumb="Customers" title="Customers" />
@@ -61,6 +66,9 @@ function AdminCustomersList() {
             section="customer"
             headers={['Customer', 'Email', 'Orders', 'Total Spent', 'Last Order']}
             rows={rows}
+            /* The name is a door now. `/admin/customers/:id` exists, so the row is no longer
+               the end of the road. */
+            links={{ 0: (row) => { const id = idByEmail.get(row[1]); if (id) navigateTo(`/customers/${id}`) } }}
             emptyIcon="users"
             emptyLabel="customers"
             total={rows.length}
@@ -72,7 +80,7 @@ function AdminCustomersList() {
 }
 
 function AdminReviewsList() {
-  const { data, error, isLoading, refetch } = useApiQuery((signal) => api.admin.reviews(signal), [])
+  const { data, error, isLoading, refetch } = useApiQuery((signal) => api.admin.reviews.list({ pageSize: 50 }, signal), [])
 
   const rows = useMemo(() => (data?.reviews ?? []).map((review) => [
     review.productName,

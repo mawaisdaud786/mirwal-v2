@@ -4,6 +4,7 @@ import { navigateTo } from '@mirwal/shared/navigation'
 import AdminLayout from './AdminLayout'
 import { EmptyState, LoadingState, ErrorState } from './AdminStates'
 import { useApiQuery, describeApiError } from '@mirwal/shared/useApiQuery'
+import { useAdminSession } from '../AdminSession'
 import api from '../api'
 import Icon from '@mirwal/shared/Icon'
 import './seller-pages.css'
@@ -82,6 +83,11 @@ function SellerList({ mode }) {
   const [status, setStatus] = useState(isApplications ? 'pending' : '')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+
+  // Approving and rejecting a store is its own permission on the route; a reviewer without
+  // it sees the store and no decision buttons rather than an error after clicking.
+  const { can } = useAdminSession()
+  const canDecide = can('seller.approve')
 
   const counts = useApiQuery((signal) => api.admin.sellers.statusCounts(signal), [])
   const list = useApiQuery(
@@ -206,7 +212,11 @@ function SellerList({ mode }) {
                         {seller.legalName !== seller.storeName && <small>{seller.legalName}</small>}
                       </td>
                       <td>
-                        {seller.owner?.name ?? '—'}
+                        {/* The owner is a person with orders of their own; reaching them meant
+                            going to Customers and searching by name. */}
+                        {seller.owner?.id
+                          ? <button type="button" className="table-link" onClick={() => navigateTo(`/customers/${seller.owner.id}`)}>{seller.owner.name}</button>
+                          : (seller.owner?.name ?? '—')}
                         {seller.owner?.email && <small>{seller.owner.email}</small>}
                       </td>
                       <td>{seller.city || '—'}</td>
@@ -214,7 +224,7 @@ function SellerList({ mode }) {
                       <td><Status value={seller.status} /></td>
                       <td>{formatDate(seller.createdAt)}</td>
                       <td className="seller-row-actions">
-                        {seller.status === 'pending' ? (
+                        {canDecide && seller.status === 'pending' ? (
                           <>
                             <button type="button" className="approve" disabled={busy === seller.id} onClick={() => approve(seller)}>
                               {busy === seller.id ? 'Working...' : 'Approve'}

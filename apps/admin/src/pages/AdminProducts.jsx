@@ -1,45 +1,13 @@
 import { useMemo, useState } from 'react'
 import AdminLayout from './AdminLayout'
 import { EmptyState, LoadingState, ErrorState } from './AdminStates'
+import { Pagination, RowActions } from './AdminComponents'
+import { useAdminSession } from '../AdminSession'
 import { useApiQuery, describeApiError } from '@mirwal/shared/useApiQuery'
 import { navigateTo } from '@mirwal/shared/navigation'
 import api from '../api'
 import Icon from '@mirwal/shared/Icon'
 import './products.css'
-
-/**
- * Products was 10 hard-coded rows (borrowing images from the unrelated public `mockData.js`)
- * with invented SKUs, barcodes, sellers, sales counts, ratings and a "May 24, 2025" created
- * date on every row, six KPI cards claiming "84,291 total products" and "2,340 pending
- * approval," and an "Add New Product" form whose Save button just flipped local state to
- * "saved" with nothing behind it.
- *
- * The list below reads the public catalogue (`GET /products`, the same
- * endpoint the public storefront uses) only ever returns `status = 'active'` products — there
- * is no way to see a pending-approval or rejected queue through it, because those states are
- * invisible to every public/admin-facing endpoint that exists. It also deliberately never
- * exposes an exact stock count (see the comment in `catalog.service.js`'s `shapeProduct` — the
- * original mock UI's "Only 8 items left!" was flagged as false urgency in the Phase 0 audit),
- * only in-stock/low-stock/out-of-stock booleans. So this page shows real product names, images,
- * categories, sellers, prices, ratings and publish dates, real stock badges (not fake exact
- * counts), and KPIs that are honestly derivable — total products, and in/low/out-of-stock
- * breakdowns computed from the full real catalog rather than one fabricated page of it. SKU,
- * barcode, sales counts, and a pending/rejected queue are dropped rather than invented.
- * Add New Product is a real form now — `POST /admin/products` exists, and it creates a listing
- * against a chosen seller. Export/Import stay disabled and explained rather than left to
- * silently do nothing.
- */
-
-// The API caps pageSize at 60 (catalog.schemas.js) so a caller can't request the whole
-// catalogue in one request. Kept at the cap so the KPIs below stay accurate for as long as
-// the real catalog fits in one page; see `haveAll` for the honest fallback once it doesn't.
-const PAGE_SIZE = 60
-
-function Status({ inStock, lowStock }) {
-  if (!inStock) return <span className="product-status rejected">Out of Stock</span>
-  if (lowStock) return <span className="product-status pending-approval">Low Stock</span>
-  return <span className="product-status published">In Stock</span>
-}
 
 function Panel({ children }) { return <section className="products-panel">{children}</section> }
 
@@ -223,58 +191,83 @@ function ProductForm() {
   )
 }
 
-const SORTERS = {
-  name: (a, b) => a.name.localeCompare(b.name),
-  price: (a, b) => Number(a.price.amount) - Number(b.price.amount),
-  rating: (a, b) => b.rating.average - a.rating.average,
-  published: (a, b) => new Date(b.publishedAt ?? 0) - new Date(a.publishedAt ?? 0),
+/** The statuses a listing can be in, in the order an operator works through them. */
+const STATUS_TABS = [
+  ['', 'All'],
+  ['pending_review', 'Awaiting review'],
+  ['active', 'Live'],
+  ['draft', 'Drafts'],
+  ['rejected', 'Rejected'],
+  ['delisted', 'Delisted'],
+  ['archived', 'Archived'],
+]
+
+const STATUS_TONE = {
+  active: 'published', pending_review: 'pending-approval', draft: 'pending-approval',
+  rejected: 'rejected', delisted: 'rejected', archived: 'rejected',
 }
 
-function SortHeader({ id, label, sort, onSort }) {
-  const active = sort.key === id
-  return <th>
-    <button type="button" className={`sort-header${active ? ' active' : ''}`} onClick={() => onSort(id)}>
-      {label}
-      <i className={`fa-solid fa-arrow-${active && sort.dir === 'asc' ? 'up' : 'down'}${active ? '' : ' is-idle'}`} aria-hidden="true" />
-    </button>
-  </th>
+function ListingStatus({ value }) {
+  return <span className={`product-status ${STATUS_TONE[value] ?? ''}`}>{String(value).replace(/_/g, ' ')}</span>
 }
 
 function AdminProductsList() {
+  const { can } = useAdminSession()
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('All Stock')
-  const [sort, setSort] = useState({ key: null, dir: 'asc' })
-  const { data, error, isLoading, refetch } = useApiQuery((signal) => api.products.list({ pageSize: PAGE_SIZE }, signal), [])
+  const [status, setStatus] = useState('')
+  const [sort, setSort] = useState('newest')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+  const [busyId, setBusyId] = useState(null)
+  const [flash, setFlash] = useState(null)
+
+  /**
+   * Filtering, sorting and paging all happen on the server.
+   *
+   * The page used to pull one capped page of 60 and filter it in the browser, so the search box
+   * only ever searched whatever happened to be inside that page — a product outside it simply
+   * did not exist as far as the operator could tell, and there was no way to reach page two.
+   */
+  const { data, error, isLoading, refetch } = useApiQuery(
+    (signal) => api.admin.products.list(
+      {
+        page, pageSize, sort,
+        ...(status ? { status } : {}),
+        ...(search.trim() ? { search: search.trim() } : {}),
+      },
+      signal,
+    ),
+    [status, sort, search, page, pageSize],
+  )
+  const counts = useApiQuery((signal) => api.admin.products.statusCounts(signal), [])
+
   const items = useMemo(() => data?.items ?? [], [data])
-  const total = data?.pagination.total ?? 0
-  const haveAll = items.length === total
+  const pagination = data?.pagination ?? { page, pageSize, total: 0 }
 
-  const toggleSort = (key) => setSort((current) => current.key === key ? { key, dir: current.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' })
+  // Any change to what is being listed sends the reader back to the first page; staying on
+  // page 7 of a result set that now has two pages shows an empty table and looks broken.
+  const refine = (apply) => { apply(); setPage(1) }
 
-  const kpis = useMemo(() => {
-    if (!haveAll) return [['Total Products', String(total), 'cube', 'orange']]
-    const outOfStock = items.filter((p) => !p.availability.inStock).length
-    const lowStock = items.filter((p) => p.availability.inStock && p.availability.lowStock).length
-    const healthyStock = items.length - outOfStock - lowStock
-    return [
-      ['Total Products', String(total), 'cube', 'orange'],
-      ['Healthy Stock', String(healthyStock), 'circle-check', 'green'],
-      ['Low Stock', String(lowStock), 'triangle-exclamation', 'amber'],
-      ['Out of Stock', String(outOfStock), 'box-open', 'red'],
-    ]
-  }, [items, total, haveAll])
+  const run = async (id, action, successText) => {
+    setBusyId(id)
+    setFlash(null)
+    try {
+      await action()
+      setFlash({ tone: 'success', text: successText })
+      refetch(); counts.refetch()
+    } catch (actionError) {
+      setFlash({ tone: 'error', text: describeApiError(actionError) })
+    } finally { setBusyId(null) }
+  }
 
-  const filtered = useMemo(() => {
-    const matched = items.filter((p) => {
-      const stockStatus = !p.availability.inStock ? 'Out of Stock' : p.availability.lowStock ? 'Low Stock' : 'In Stock'
-      const matchesStatus = status === 'All Stock' || stockStatus === status
-      const matchesSearch = `${p.name} ${p.category?.name ?? ''} ${p.seller?.name ?? ''}`.toLowerCase().includes(search.toLowerCase())
-      return matchesStatus && matchesSearch
-    })
-    if (!sort.key) return matched
-    const sorted = [...matched].sort(SORTERS[sort.key])
-    return sort.dir === 'desc' ? sorted.reverse() : sorted
-  }, [items, search, status, sort])
+  const byStatus = counts.data ?? {}
+  const kpis = [
+    // The endpoint calls the grand total `all`; `total` is not a key it returns.
+    ['Total listings', String(byStatus.all ?? pagination.total), 'cube', 'orange'],
+    ['Awaiting review', String(byStatus.pending_review ?? 0), 'clock', 'amber'],
+    ['Live', String(byStatus.active ?? 0), 'circle-check', 'green'],
+    ['Rejected', String(byStatus.rejected ?? 0), 'circle-xmark', 'red'],
+  ]
 
   return (
     <AdminLayout>
@@ -285,11 +278,15 @@ function AdminProductsList() {
             <p>Home <Icon name="chevron-right" /> Marketplace <Icon name="chevron-right" /> Products</p>
           </div>
           <div className="products-heading-actions">
-            <button type="button" disabled title="There is no admin backend yet"><Icon name="download" /> Export</button>
-            <button type="button" disabled title="There is no admin backend yet"><Icon name="upload" /> Import</button>
-            <button type="button" className="primary" disabled title="There is no admin backend yet — nowhere to save a new product">
-              <Icon name="plus" /> Add New Product
-            </button>
+            <button type="button" disabled title="Bulk import and export are Phase C (C6)"><Icon name="download" /> Export</button>
+            <button type="button" disabled title="Bulk import and export are Phase C (C6)"><Icon name="upload" /> Import</button>
+            {/* This was disabled saying there was no backend. `POST /admin/products` has
+                existed for some time, and the form behind /products/new already uses it. */}
+            {can('catalog.product.write') && (
+              <button type="button" className="primary" onClick={() => navigateTo('/products/new')}>
+                <Icon name="plus" /> Add New Product
+              </button>
+            )}
           </div>
         </div>
 
@@ -304,59 +301,137 @@ function AdminProductsList() {
         </div>
 
         <Panel>
+          {flash && <p className={`products-flash ${flash.tone}`} role="status">{flash.text}</p>}
+
+          <nav className="product-status-tabs">
+            {STATUS_TABS.map(([value, label]) => (
+              <button
+                type="button"
+                key={value || 'all'}
+                className={status === value ? 'active' : ''}
+                onClick={() => refine(() => setStatus(value))}
+              >
+                {label}
+                {value && byStatus[value] > 0 && <em>{byStatus[value]}</em>}
+              </button>
+            ))}
+          </nav>
+
           <div className="product-filters">
             <label className="product-search">
               <Icon name="magnifying-glass" />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by product name, category, or seller..." aria-label="Search products" />
+              <input
+                value={search}
+                onChange={(event) => refine(() => setSearch(event.target.value))}
+                placeholder="Search by product name or SKU..."
+                aria-label="Search products"
+              />
             </label>
-            <select aria-label="Filter by stock" value={status} onChange={(event) => setStatus(event.target.value)}>
-              <option>All Stock</option>
-              <option>In Stock</option>
-              <option>Low Stock</option>
-              <option>Out of Stock</option>
+            <select aria-label="Sort" value={sort} onChange={(event) => refine(() => setSort(event.target.value))}>
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="name">Name</option>
+              <option value="price-high">Price, high to low</option>
+              <option value="price-low">Price, low to high</option>
+              {/* A queue sorted by arrival starves the listing most worth opening first. */}
+              <option value="risk">Screening risk</option>
             </select>
-            <button type="button" onClick={() => { setSearch(''); setStatus('All Stock') }}><Icon name="rotate-left" /> Reset</button>
+            <button type="button" onClick={() => refine(() => { setSearch(''); setStatus(''); setSort('newest') })}>
+              <Icon name="rotate-left" /> Reset
+            </button>
           </div>
 
           {isLoading && <LoadingState label="Loading products" />}
           {error && !isLoading && <ErrorState onRetry={refetch} />}
 
-          {!isLoading && !error && (filtered.length ? (
-            <div className="products-table-wrap">
-              <table className="products-table">
-                <thead>
-                  <tr>
-                    <SortHeader id="name" label="Product" sort={sort} onSort={toggleSort} />
-                    <th className="plain-th">Category</th><th className="plain-th">Seller</th>
-                    <SortHeader id="price" label="Price" sort={sort} onSort={toggleSort} />
-                    <th className="plain-th">Stock</th>
-                    <SortHeader id="rating" label="Rating" sort={sort} onSort={toggleSort} />
-                    <SortHeader id="published" label="Published" sort={sort} onSort={toggleSort} />
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((row) => (
-                    <tr key={row.id}>
-                      <td className="product-name">
-                        {row.images[0] && <img src={row.images[0].url} alt="" />}
-                        <span><strong>{row.name}</strong></span>
-                      </td>
-                      <td>{row.category?.name ?? '—'}</td>
-                      <td>{row.seller?.name ?? '—'}</td>
-                      <td><strong>{row.price.display}</strong></td>
-                      <td><Status inStock={row.availability.inStock} lowStock={row.availability.lowStock} /></td>
-                      <td>{row.rating.count > 0 ? <span className="rating"><Icon name="star" /> {row.rating.average.toFixed(1)}<small>({row.rating.count})</small></span> : '—'}</td>
-                      <td>{row.publishedAt ? new Date(row.publishedAt).toLocaleDateString('en-PK') : '—'}</td>
+          {!isLoading && !error && (items.length ? (
+            <>
+              <div className="products-table-wrap">
+                <table className="products-table">
+                  <thead>
+                    <tr>
+                      <th className="plain-th">Product</th>
+                      <th className="plain-th">Category</th><th className="plain-th">Seller</th>
+                      <th className="plain-th">Price</th>
+                      <th className="plain-th">Stock</th>
+                      <th className="plain-th">Status</th>
+                      <th className="plain-th">Risk</th>
+                      <th className="plain-th" />
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <EmptyState icon="box-open" title="No products found" description="No products match your search or filters. Try adjusting them." actionLabel="Reset Filters" onAction={() => { setSearch(''); setStatus('All Stock') }} />
-          ))}
+                  </thead>
+                  <tbody>
+                    {items.map((row) => (
+                      <tr key={row.id} className={busyId === row.id ? 'is-busy' : ''}>
+                        <td className="product-name">
+                          {row.imageUrl && <img src={row.imageUrl} alt="" />}
+                          {/* Three doors on one row: the listing, its taxonomy and its store. */}
+                          <button type="button" className="table-link" onClick={() => navigateTo(`/products/${row.id}`)}>
+                            <strong>{row.name}</strong>
+                          </button>
+                        </td>
+                        <td>
+                          {row.category
+                            ? <button type="button" className="table-link" onClick={() => navigateTo(`/categories/${row.category.slug}`)}>{row.category.name}</button>
+                            : '—'}
+                        </td>
+                        <td>
+                          {row.seller
+                            ? <button type="button" className="table-link" onClick={() => navigateTo(`/sellers/${row.seller.id}`)}>{row.seller.name}</button>
+                            : '—'}
+                        </td>
+                        <td><strong>{row.price.display}</strong></td>
+                        <td>{row.stock == null ? '—' : row.stock}</td>
+                        <td><ListingStatus value={row.status} /></td>
+                        <td>
+                          {row.moderationRisk > 0
+                            ? <span className={`product-risk ${row.moderationRisk >= 60 ? 'high' : row.moderationRisk >= 30 ? 'medium' : 'low'}`}>{row.moderationRisk}</span>
+                            : '—'}
+                        </td>
+                        <td>
+                          <RowActions
+                            label={row.name}
+                            actions={[
+                              { label: 'Open', icon: 'arrow-right', onClick: () => navigateTo(`/products/${row.id}`) },
+                              can('catalog.product.approve') && row.status === 'pending_review' && {
+                                label: 'Approve', icon: 'circle-check',
+                                onClick: () => run(row.id, () => api.admin.products.setApproval(row.id, { approved: true }), `"${row.name}" is live.`),
+                              },
+                              can('catalog.product.write') && row.status === 'active' && {
+                                label: 'Delist', icon: 'eye-slash',
+                                onClick: () => run(row.id, () => api.admin.products.setStatus(row.id, 'delisted'), `"${row.name}" was delisted.`),
+                              },
+                              can('catalog.product.delete') && {
+                                label: 'Delete', icon: 'trash', danger: true,
+                                confirm: `Delete "${row.name}"? This cannot be undone from here.`,
+                                onClick: () => run(row.id, () => api.admin.products.remove(row.id), `"${row.name}" was deleted.`),
+                              },
+                            ]}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-          {filtered.length > 0 && <div className="products-footer"><span>Showing {filtered.length} of {total} products{!haveAll ? ' (showing the first ' + PAGE_SIZE + ')' : ''}</span></div>}
+              <Pagination
+                section="products"
+                page={pagination.page}
+                pageSize={pagination.pageSize}
+                total={pagination.total}
+                onPage={setPage}
+                onPageSize={(size) => { setPageSize(size); setPage(1) }}
+              />
+            </>
+          ) : (
+            <EmptyState
+              icon="box-open"
+              title="No products found"
+              description={status ? 'Nothing is in this state right now.' : 'No products match your search. Try adjusting it.'}
+              actionLabel="Reset filters"
+              onAction={() => refine(() => { setSearch(''); setStatus('') })}
+            />
+          ))}
         </Panel>
       </div>
     </AdminLayout>

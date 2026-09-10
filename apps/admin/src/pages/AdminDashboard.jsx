@@ -4,6 +4,7 @@ import Icon from '@mirwal/shared/Icon'
 import { useApiQuery } from '@mirwal/shared/useApiQuery'
 import api from '../api'
 import { navigateTo } from '@mirwal/shared/navigation'
+import WorkQueue from './WorkQueue'
 import './dashboard.css'
 
 /**
@@ -56,6 +57,10 @@ function DashboardContent() {
   const totalCategoryRevenue = revenueByCategory.reduce((sum, category) => sum + Number(category.revenue.amount), 0)
 
   return <>
+    {/* Above the KPIs on purpose: thirty-day GMV is worth knowing, but it is not what anyone
+        opening this page at nine in the morning actually needs to act on. */}
+    <WorkQueue />
+
     <div className="kpi-grid">
       {kpiCards.map(([label, value, icon, color]) => (
         <article className={`kpi-card ${color}`} key={label}>

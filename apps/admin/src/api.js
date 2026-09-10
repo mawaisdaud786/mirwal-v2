@@ -23,12 +23,33 @@ export const api = {
 
   admin: {
     orders: {
-      list: (signal) => request('/admin/orders', { signal }),
+      // Paged, searched and filtered server-side: the whole order table used to cross the wire
+      // on every visit, and the panel filtered whatever had arrived.
+      list: (params, signal) => request(`/admin/orders${buildQuery(params)}`, { signal }),
+      counts: (signal) => request('/admin/orders/counts', { signal }),
       get: (id, signal) => request(`/admin/orders/${encodeURIComponent(id)}`, { signal }),
     },
     analytics: (params, signal) => request(`/admin/analytics${buildQuery(params)}`, { signal }),
     customers: (signal) => request('/admin/customers', { signal }),
-    reviews: (signal) => request('/admin/reviews', { signal }),
+    // One buyer: what they bought, what went wrong, and what they are owed. A support and risk
+    // view — there is deliberately no endpoint here that edits somebody's profile.
+    customer: (id, signal) => request(`/admin/customers/${encodeURIComponent(id)}`, { signal }),
+    /**
+     * Reviews.
+     *
+     * `list` is the plain read the customer pages use. The rest is moderation: verified
+     * purchase is enforced in the database, so nothing here decides whether a review is
+     * genuine — only whether it may stand. `hidden` keeps the rating and drops the text;
+     * `removed` drops both, which is why they are separate actions rather than one delete.
+     */
+    reviews: {
+      // Paged and filterable now. It used to return a hard LIMIT 200, so on a marketplace
+      // with more reviews than that the rest were unreachable from the panel entirely.
+      list: (params, signal) => request(`/admin/reviews${buildQuery(params)}`, { signal }),
+      queue: (params, signal) => request(`/admin/reviews/queue${buildQuery(params)}`, { signal }),
+      patterns: (signal) => request('/admin/reviews/patterns', { signal }),
+      moderate: (id, body) => request(`/admin/reviews/${encodeURIComponent(id)}/moderate`, { method: 'PATCH', body, envelope: true }),
+    },
 
     /**
      * Catalogue management — the admin-scoped product surface, distinct from the public
@@ -55,6 +76,19 @@ export const api = {
       remove: (slug) => request(`/admin/categories/${encodeURIComponent(slug)}`, { method: 'DELETE' }),
     },
 
+    /**
+     * Brand authorisation — who may list against a protected brand.
+     *
+     * Gating is per brand rather than marketplace-wide: most brands need nothing, and demanding
+     * paperwork for all of them would stall the catalogue for no safety gain. `setGate` is the
+     * switch that decides where the control applies; `decide` handles one seller's request.
+     */
+    brandAuth: {
+      list: (params, signal) => request(`/admin/brand-authorizations${buildQuery(params)}`, { signal }),
+      decide: (id, body) => request(`/admin/brand-authorizations/${encodeURIComponent(id)}`, { method: 'PATCH', body, envelope: true }),
+      setGate: (slug, body) => request(`/admin/brands/${encodeURIComponent(slug)}/gate`, { method: 'PATCH', body, envelope: true }),
+    },
+
     brands: {
       list: (signal) => request('/admin/brands', { signal }),
       create: (body) => request('/admin/brands', { method: 'POST', body }),
@@ -68,11 +102,84 @@ export const api = {
     },
 
     /**
-     * Stores and applications. The seller-applications queue is this same endpoint filtered
-     * to `status: 'pending'` — an application is a store awaiting a decision, not a separate
-     * entity, so there is no second endpoint to keep in sync.
-     */
-    sellers: {
+   * Trust & safety cases.
+   *
+   * One resource for reports, complaints and disputes: they are the same object with different
+   * subjects. Resolving a case says what Mirwal concluded; enforcement (see `sellers.enforce`)
+   * is what it did about it, and the two are deliberately separate because one case can produce
+   * several actions or none.
+   */
+  cases: {
+    list: (params, signal) => request(`/admin/cases${buildQuery(params)}`, { signal }),
+    stats: (signal) => request('/admin/cases/stats', { signal }),
+    get: (id, signal) => request(`/admin/cases/${encodeURIComponent(id)}`, { signal }),
+    assign: (id) => request(`/admin/cases/${encodeURIComponent(id)}/assign`, { method: 'POST', envelope: true }),
+    message: (id, body) => request(`/admin/cases/${encodeURIComponent(id)}/messages`, { method: 'POST', body, envelope: true }),
+    resolve: (id, body) => request(`/admin/cases/${encodeURIComponent(id)}/resolve`, { method: 'POST', body, envelope: true }),
+  },
+
+  /**
+   * Seller applications.
+   *
+   * Separate from `sellers` because an application is a submission with a decision history and
+   * a store is a trading entity: approval creates the store, so before that point there is no
+   * store row to filter for. The old queue — `GET /sellers?status=pending` — could only ever
+   * be empty in production, because nothing outside the seeder created a pending store.
+   */
+  applications: {
+    list: (params, signal) => request(`/admin/applications${buildQuery(params)}`, { signal }),
+    counts: (signal) => request('/admin/applications/counts', { signal }),
+    get: (id, signal) => request(`/admin/applications/${encodeURIComponent(id)}`, { signal }),
+    // Claiming stops two reviewers working the same case.
+    claim: (id) => request(`/admin/applications/${encodeURIComponent(id)}/claim`, { method: 'POST', envelope: true }),
+    requestInfo: (id, body) => request(`/admin/applications/${encodeURIComponent(id)}/request-info`, { method: 'POST', body, envelope: true }),
+    approve: (id, body) => request(`/admin/applications/${encodeURIComponent(id)}/approve`, { method: 'POST', body, envelope: true }),
+    reject: (id, body) => request(`/admin/applications/${encodeURIComponent(id)}/reject`, { method: 'POST', body, envelope: true }),
+  },
+
+  /**
+   * Intervening in an order after it is placed.
+   *
+   * Each of these is its own permission rather than riding on `order.write`: support can cancel
+   * and read the conversation, finance can refund, and neither inherits the other. `onBehalfOf`
+   * decides whose record a cancellation lands on — an operator cancelling for a seller who
+   * telephoned is still the seller's failure.
+   */
+  fulfilment: {
+    cancelItem: (itemId, body) =>
+      request(`/admin/order-items/${encodeURIComponent(itemId)}/cancel`, { method: 'PATCH', body, envelope: true }),
+    refund: (orderId, body) =>
+      request(`/admin/orders/${encodeURIComponent(orderId)}/refund`, { method: 'POST', body, envelope: true }),
+    invoice: (orderId, signal) => request(`/admin/orders/${encodeURIComponent(orderId)}/invoice`, { signal }),
+    thread: (orderId, sellerId, signal) =>
+      request(`/admin/orders/${encodeURIComponent(orderId)}/messages/${encodeURIComponent(sellerId)}`, { signal }),
+    reply: (orderId, sellerId, body) =>
+      request(`/admin/orders/${encodeURIComponent(orderId)}/messages/${encodeURIComponent(sellerId)}`, { method: 'POST', body, envelope: true }),
+  },
+
+  /**
+   * Disputed returns.
+   *
+   * Distinct from the read-only `disputes` view: this is the queue where Mirwal actually
+   * decides, on its own permission, because overturning a seller's decision moves money away
+   * from them and is not the same authority as being able to read an order.
+   */
+  /**
+   * Every queue that needs a human, in one call.
+   *
+   * Filtered server-side by permission, so this returns only what the signed-in operator can
+   * act on — work everybody can see is work nobody owns.
+   */
+  workQueue: (signal) => request('/admin/work-queue', { signal }),
+
+  returnDisputes: {
+    list: (params, signal) => request(`/admin/returns/disputes${buildQuery(params)}`, { signal }),
+    get: (id, signal) => request(`/admin/returns/disputes/${encodeURIComponent(id)}`, { signal }),
+    decide: (id, body) => request(`/admin/returns/disputes/${encodeURIComponent(id)}/decide`, { method: 'POST', body, envelope: true }),
+    note: (id, body) => request(`/admin/returns/disputes/${encodeURIComponent(id)}/messages`, { method: 'POST', body, envelope: true }),
+  },
+
+  sellers: {
       list: (params, signal) => request(`/admin/sellers${buildQuery(params)}`, { signal }),
       statusCounts: (signal) => request('/admin/sellers/status-counts', { signal }),
       get: (id, signal) => request(`/admin/sellers/${encodeURIComponent(id)}`, { signal }),
@@ -80,6 +187,15 @@ export const api = {
       reject: (id, reason) => request(`/admin/sellers/${encodeURIComponent(id)}/reject`, { method: 'POST', body: { reason }, envelope: true }),
       suspend: (id, reason) => request(`/admin/sellers/${encodeURIComponent(id)}/suspend`, { method: 'POST', body: { reason }, envelope: true }),
       reinstate: (id) => request(`/admin/sellers/${encodeURIComponent(id)}/reinstate`, { method: 'POST', envelope: true }),
+      /**
+       * Enforcement, kept separate from the approve/suspend lifecycle above.
+       *
+       * Suspending a store is a lifecycle state; a warning, a payout hold or a listing
+       * restriction is a recorded action with its own expiry and its own appeal. One case can
+       * produce several, or none.
+       */
+      enforce: (id, body) => request(`/admin/sellers/${encodeURIComponent(id)}/enforce`, { method: 'POST', body, envelope: true }),
+      enforcementHistory: (id, signal) => request(`/admin/sellers/${encodeURIComponent(id)}/enforcement`, { signal }),
     },
 
     auditLogs: {
@@ -313,6 +429,7 @@ export const api = {
   },
   categories: { list: (signal) => request('/categories', { signal }) },
   brands: { list: (signal) => request('/brands', { signal }) },
+
   sellers: {
     list: (signal) => request('/sellers', { signal }),
     get: (slug, signal) => request(`/sellers/${encodeURIComponent(slug)}`, { signal }),

@@ -1,0 +1,24 @@
+/* What needs a decision, above the dashboard's own numbers. */
+.workqueue { margin: 0 0 18px; padding: 16px; border: 1px solid var(--admin-border); border-radius: 10px; background: var(--admin-surface, #fff); }
+.workqueue header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.workqueue header h2 { margin: 0; font-size: 14px; }
+.workqueue header p { margin: 0; font-size: 11px; color: var(--admin-text-muted); }
+.workqueue header b { color: #b3261e; }
+
+.workqueue ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+.workqueue li button { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 11px; width: 100%; padding: 11px 12px; border: 1px solid var(--admin-border); border-radius: 8px; background: var(--admin-surface, #fff); text-align: left; cursor: pointer; }
+.workqueue li button:hover { border-color: var(--admin-primary, #e8622c); }
+/* Late queues are marked, not merely counted — the point is that they are visible from across
+   the room without reading the numbers. */
+.workqueue-late button { border-color: #f1c4c0; background: #fdf6f5; }
+
+.workqueue-count { min-width: 30px; font: 700 18px/1 var(--admin-font-heading, inherit); text-align: center; }
+.workqueue-late .workqueue-count { color: #b3261e; }
+.workqueue-label { display: grid; gap: 2px; min-width: 0; }
+.workqueue-label b { font-size: 12px; }
+.workqueue-label small { font-size: 10px; color: var(--admin-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workqueue-late .workqueue-label small { color: #b3261e; }
+
+.workqueue-clear { display: flex; align-items: center; gap: 9px; padding: 12px 16px; }
+.workqueue-clear p { margin: 0; font-size: 12px; color: var(--admin-text-muted); }
+.workqueue-clear .fa-solid, .workqueue-clear svg { color: var(--admin-success, #1c6b3f); }

@@ -189,10 +189,18 @@ export default function AdminCategories({ create = false }) {
                       {visible.map((category) => (
                         <tr key={category.slug}>
                           <td>
-                            <strong>{category.name}</strong>
+                            {/* The name opens the category: its fields, and what is listed
+                                under it. The row used to be the end of the road. */}
+                            <button type="button" className="table-link" onClick={() => navigateTo(`/categories/${category.slug}`)}>
+                              <strong>{category.name}</strong>
+                            </button>
                             <small>{category.slug}</small>
                           </td>
-                          <td>{category.parent ? category.parent.name : <span className="categories-muted">Top level</span>}</td>
+                          <td>
+                            {category.parent
+                              ? <button type="button" className="table-link" onClick={() => navigateTo(`/categories/${category.parent.slug}`)}>{category.parent.name}</button>
+                              : <span className="categories-muted">Top level</span>}
+                          </td>
                           <td>{category.productCount}</td>
                           <td>{category.position}</td>
                           <td>

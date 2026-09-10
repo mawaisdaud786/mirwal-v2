@@ -84,3 +84,15 @@
 .approval-actions .reject{border-color:var(--admin-danger-light);color:var(--admin-danger);background:var(--admin-danger-light)}
 .approval-actions button:disabled{opacity:.55}
 @media(max-width:800px){.marketplace-kpis{grid-template-columns:repeat(2,1fr)}.approval-card{grid-template-columns:1fr}.approval-card img,.approval-noimage{width:100%;height:150px}}
+
+/* Brand authorisation: the queue sits inside the brands panel, so it reads as part of it. */
+.marketplace-subpanel{margin:0 0 18px;padding:14px;border:1px solid var(--admin-border);border-radius:8px;background:var(--admin-surface-muted,#faf8f6)}
+.marketplace-subpanel h2{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:15px}
+.marketplace-subpanel h2 em{padding:1px 8px;border-radius:999px;font-size:12px;font-style:normal;color:#8a6d1f;background:#fff6e0}
+.marketplace-subpanel td small{display:block;font-size:11px;color:var(--admin-text-muted)}
+.marketplace-pending{display:block;margin-top:3px;font-size:11px;color:#8a6d1f}
+.marketplace-decision{display:grid;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--admin-border)}
+.marketplace-decision label{display:grid;gap:4px;font-size:13px}
+.marketplace-decision small{font-size:11px;color:var(--admin-text-muted)}
+.marketplace-decision input,.marketplace-decision textarea{padding:7px 9px;border:1px solid var(--admin-border);border-radius:6px;font:inherit}
+.marketplace-decision>div{display:flex;gap:8px}

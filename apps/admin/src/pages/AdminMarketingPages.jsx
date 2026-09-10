@@ -5,6 +5,8 @@ import { EmptyState, ErrorState, LoadingState } from './AdminStates'
 import { useApiQuery, describeApiError } from '@mirwal/shared/useApiQuery'
 import { navigateTo } from '@mirwal/shared/navigation'
 import Icon from '@mirwal/shared/Icon'
+import { Pagination } from './AdminComponents'
+import { useAdminSession } from '../AdminSession'
 import api from '../api'
 import './marketing-pages.css'
 
@@ -85,10 +87,48 @@ function CouponsPage({ create }) {
   const [search, setSearch] = useState('')
   const [form, setForm] = useState(EMPTY_COUPON)
 
+  /**
+   * Editing, not just creating.
+   *
+   * `/coupons/:id` rendered the blank create form whichever coupon had been clicked, so a row
+   * was a link to a page that could only add a second coupon. When the route names one, it is
+   * loaded and the same form saves over it.
+   */
+  const editingId = create && typeof window !== 'undefined'
+    ? window.location.pathname.split('/').filter(Boolean).slice(1).find((part) => part !== 'new')
+    : undefined
+  const editing = useApiQuery(
+    (signal) => (editingId ? api.admin.coupons.get(editingId, signal) : Promise.resolve(null)),
+    [editingId],
+  )
+  const [loadedFor, setLoadedFor] = useState(null)
+  if (editing.data && loadedFor !== editingId) {
+    setLoadedFor(editingId)
+    setForm({
+      code: editing.data.code ?? '',
+      name: editing.data.name ?? '',
+      discountType: editing.data.discountType ?? 'percentage',
+      discountPercent: String(editing.data.discountPercent ?? ''),
+      discountAmount: editing.data.discountAmount?.amount ?? '',
+      minOrderAmount: editing.data.minOrderAmount?.amount ?? '',
+      usageLimit: editing.data.usageLimit == null ? '' : String(editing.data.usageLimit),
+      status: editing.data.status ?? 'active',
+    })
+  }
+
   const stats = useApiQuery((signal) => api.admin.coupons.stats(signal), [])
+  /**
+   * Paged rather than capped at fifty, and gated the way the route is: `settings.manage`
+   * covers creating, editing and withdrawing a coupon, so without it this is a read-only list
+   * rather than a page of buttons that fail.
+   */
+  const { can } = useAdminSession()
+  const canManage = can('settings.manage')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
   const list = useApiQuery(
-    (signal) => api.admin.coupons.list({ pageSize: 50, ...(status ? { status } : {}), ...(search ? { search } : {}) }, signal),
-    [status, search],
+    (signal) => api.admin.coupons.list({ page, pageSize, ...(status ? { status } : {}), ...(search ? { search } : {}) }, signal),
+    [status, search, page, pageSize],
   )
   const refresh = useCallback(async () => { list.refetch(); stats.refetch() }, [list, stats])
   const { busy, flash, submit } = useSubmit(refresh)
@@ -107,8 +147,14 @@ function CouponsPage({ create }) {
       ...(form.discountType === 'fixed' ? { discountAmount: form.discountAmount } : {}),
       ...(form.usageLimit ? { usageLimit: Number(form.usageLimit) } : {}),
     }
-    if (await submit(() => api.admin.coupons.create(payload))) {
+    // Editing sends a patch; the code itself is not resent, because changing the code of a
+    // coupon people already hold is a different act from correcting its terms.
+    const action = editingId
+      ? () => api.admin.coupons.update(editingId, { ...payload, code: undefined })
+      : () => api.admin.coupons.create(payload)
+    if (await submit(action)) {
       setForm(EMPTY_COUPON)
+      setLoadedFor(null)
       navigateTo('/coupons')
     }
   }
@@ -244,7 +290,12 @@ function CouponsPage({ create }) {
                     <tbody>
                       {items.map((coupon) => (
                         <tr key={coupon.id}>
-                          <td><code>{coupon.code}</code></td>
+                          <td>
+                            {/* The code opens the coupon rather than only naming it. */}
+                            <button type="button" className="table-link" onClick={() => navigateTo(`/coupons/${coupon.id}`)}>
+                              <code>{coupon.code}</code>
+                            </button>
+                          </td>
                           <td>{coupon.name}</td>
                           <td>
                             {coupon.discountType === 'percentage' && `${coupon.discountPercent}%`}
@@ -252,18 +303,33 @@ function CouponsPage({ create }) {
                             {coupon.discountType === 'free_shipping' && 'Free shipping'}
                           </td>
                           <td>{coupon.usageCount}{coupon.usageLimit ? ` / ${coupon.usageLimit}` : ''}</td>
-                          <td>{coupon.owner ? coupon.owner.name : 'Mirwal'}</td>
+                          <td>
+                            {coupon.owner?.id
+                              ? <button type="button" className="table-link" onClick={() => navigateTo(`/sellers/${coupon.owner.id}`)}>{coupon.owner.name}</button>
+                              : (coupon.owner?.name ?? 'Mirwal')}
+                          </td>
                           <td><StatusPill value={coupon.effectiveStatus} /></td>
                           <td>{formatDate(coupon.endsAt)}</td>
                           <td>
-                            <button type="button" className="marketing-danger" disabled={busy} onClick={() => onDelete(coupon)} aria-label={`Withdraw ${coupon.code}`}>
-                              <Icon name="trash" />
-                            </button>
+                            {canManage && (
+                              <button type="button" className="marketing-danger" disabled={busy} onClick={() => onDelete(coupon)} aria-label={`Withdraw ${coupon.code}`}>
+                                <Icon name="trash" />
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
+                  <Pagination
+                    section="marketing"
+                    page={list.data?.pagination?.page ?? page}
+                    pageSize={list.data?.pagination?.pageSize ?? pageSize}
+                    total={list.data?.pagination?.total ?? 0}
+                    onPage={setPage}
+                    onPageSize={(size) => { setPageSize(size); setPage(1) }}
+                  />
+
                 </div>
               ))}
             </>
@@ -284,7 +350,42 @@ function PromotionsPage({ type, create }) {
   const { kind, title, noun } = KINDS[type]
   const [form, setForm] = useState(EMPTY_PROMOTION)
 
-  const list = useApiQuery((signal) => api.admin.promotions.list({ kind, pageSize: 50 }, signal), [kind])
+  /**
+   * Editing, not just creating. Same reasoning as the coupon form: `/promotions/:id` used to
+   * render the blank create form whichever promotion had been clicked.
+   */
+  const editingId = create && typeof window !== 'undefined'
+    ? window.location.pathname.split('/').filter(Boolean).slice(1).find((part) => part !== 'new')
+    : undefined
+  const editing = useApiQuery(
+    (signal) => (editingId ? api.admin.promotions.get(editingId, signal) : Promise.resolve(null)),
+    [editingId],
+  )
+  const [loadedFor, setLoadedFor] = useState(null)
+  if (editing.data && loadedFor !== editingId) {
+    setLoadedFor(editingId)
+    setForm({
+      ...EMPTY_PROMOTION,
+      name: editing.data.name ?? '',
+      description: editing.data.description ?? '',
+      discountType: editing.data.discountType ?? 'percentage',
+      discountPercent: String(editing.data.discountPercent ?? ''),
+      discountAmount: editing.data.discountAmount?.amount ?? '',
+      priority: String(editing.data.priority ?? 0),
+      // `datetime-local` wants a naked local timestamp, not an ISO string with a zone on it.
+      startsAt: editing.data.startsAt ? String(editing.data.startsAt).replace(' ', 'T').slice(0, 16) : '',
+      endsAt: editing.data.endsAt ? String(editing.data.endsAt).replace(' ', 'T').slice(0, 16) : '',
+    })
+  }
+
+  const { can } = useAdminSession()
+  const canManage = can('settings.manage')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+  const list = useApiQuery(
+    (signal) => api.admin.promotions.list({ kind, page, pageSize }, signal),
+    [kind, page, pageSize],
+  )
   const refresh = useCallback(async () => { list.refetch() }, [list])
   const { busy, flash, submit } = useSubmit(refresh)
 
@@ -305,8 +406,12 @@ function PromotionsPage({ type, create }) {
       ...(form.startsAt ? { startsAt: new Date(form.startsAt).toISOString() } : {}),
       ...(form.endsAt ? { endsAt: new Date(form.endsAt).toISOString() } : {}),
     }
-    if (await submit(() => api.admin.promotions.create(payload))) {
+    const action = editingId
+      ? () => api.admin.promotions.update(editingId, payload)
+      : () => api.admin.promotions.create(payload)
+    if (await submit(action)) {
       setForm(EMPTY_PROMOTION)
+      setLoadedFor(null)
       navigateTo(basePath)
     }
   }
@@ -417,7 +522,11 @@ function PromotionsPage({ type, create }) {
                     <tbody>
                       {items.map((promotion) => (
                         <tr key={promotion.id}>
-                          <td>{promotion.name}</td>
+                          <td>
+                            <button type="button" className="table-link" onClick={() => navigateTo(`${basePath}/${promotion.id}`)}>
+                              {promotion.name}
+                            </button>
+                          </td>
                           <td>
                             {promotion.discountType === 'percentage' && `${promotion.discountPercent}%`}
                             {promotion.discountType === 'fixed' && (promotion.discountAmount?.display ?? '—')}
@@ -428,14 +537,23 @@ function PromotionsPage({ type, create }) {
                           <td>{formatDate(promotion.startsAt)} → {formatDate(promotion.endsAt)}</td>
                           <td><StatusPill value={promotion.effectiveStatus} /></td>
                           <td>
-                            <button type="button" className="marketing-danger" disabled={busy} onClick={() => onDelete(promotion)} aria-label={`Delete ${promotion.name}`}>
+                            {canManage && <button type="button" className="marketing-danger" disabled={busy} onClick={() => onDelete(promotion)} aria-label={`Delete ${promotion.name}`}>
                               <Icon name="trash" />
-                            </button>
+                            </button>}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
+                  <Pagination
+                    section="marketing"
+                    page={list.data?.pagination?.page ?? page}
+                    pageSize={list.data?.pagination?.pageSize ?? pageSize}
+                    total={list.data?.pagination?.total ?? 0}
+                    onPage={setPage}
+                    onPageSize={(size) => { setPageSize(size); setPage(1) }}
+                  />
+
                 </div>
               ))}
             </>

@@ -6,6 +6,7 @@ import { EmptyState, LoadingState, ErrorState } from './AdminStates'
 import { useApiQuery, describeApiError } from '@mirwal/shared/useApiQuery'
 import { navigateTo } from '@mirwal/shared/navigation'
 import Icon from '@mirwal/shared/Icon'
+import { Pagination } from './AdminComponents'
 import api from '../api'
 import './order-pages.css'
 import './finance-pages.css'
@@ -54,9 +55,17 @@ function Kpi({ label, value, hint, tone }) {
 
 function ReturnsList() {
   const [status, setStatus] = useState('')
+  /**
+   * Paged rather than capped at a hundred.
+   *
+   * `pageSize: 100` reads as a page and behaves as a ceiling — the hundred-and-first return was
+   * unreachable, and nothing on screen admitted it existed.
+   */
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
   const query = useApiQuery(
-    (signal) => api.admin.returns.list({ pageSize: 100, ...(status ? { status } : {}) }, signal),
-    [status],
+    (signal) => api.admin.returns.list({ page, pageSize, ...(status ? { status } : {}) }, signal),
+    [status, page, pageSize],
   )
 
   const items = query.data?.items ?? []
@@ -107,10 +116,27 @@ function ReturnsList() {
                 <tbody>
                   {items.map((request) => (
                     <tr key={request.id} className="fulfil-row" onClick={() => navigateTo(`/disputes/${request.id}`)}>
-                      <td><b>{request.orderNumber}</b></td>
-                      <td><b>{request.productName}</b><small>{request.quantity} × {request.amount.display}</small></td>
-                      <td>{request.seller.name}</td>
-                      <td>{request.buyer.name}</td>
+                      <td onClick={(event) => event.stopPropagation()}>
+                        {request.orderId
+                          ? <button type="button" className="table-link" onClick={() => navigateTo(`/orders/${request.orderId}`)}><b>{request.orderNumber}</b></button>
+                          : <b>{request.orderNumber}</b>}
+                      </td>
+                      <td onClick={(event) => event.stopPropagation()}>
+                        {request.productId
+                          ? <button type="button" className="table-link" onClick={() => navigateTo(`/products/${request.productId}`)}><b>{request.productName}</b></button>
+                          : <b>{request.productName}</b>}
+                        <small>{request.quantity} × {request.amount.display}</small>
+                      </td>
+                      <td onClick={(event) => event.stopPropagation()}>
+                        {request.seller.id
+                          ? <button type="button" className="table-link" onClick={() => navigateTo(`/sellers/${request.seller.id}`)}>{request.seller.name}</button>
+                          : request.seller.name}
+                      </td>
+                      <td onClick={(event) => event.stopPropagation()}>
+                        {request.buyer.id
+                          ? <button type="button" className="table-link" onClick={() => navigateTo(`/customers/${request.buyer.id}`)}>{request.buyer.name}</button>
+                          : request.buyer.name}
+                      </td>
                       <td>{request.reason}{request.description && <small>{request.description.slice(0, 70)}</small>}</td>
                       <td><span className={`finance-pill ${request.status}`}>{request.status}</span></td>
                       <td>{request.refund ? <span className={`finance-pill ${request.refund.status}`}>{request.refund.status}</span> : '—'}</td>
@@ -119,6 +145,15 @@ function ReturnsList() {
                   ))}
                 </tbody>
               </table>
+              <Pagination
+                section="fulfil"
+                page={query.data?.pagination?.page ?? page}
+                pageSize={query.data?.pagination?.pageSize ?? pageSize}
+                total={query.data?.pagination?.total ?? 0}
+                onPage={setPage}
+                onPageSize={(size) => { setPageSize(size); setPage(1) }}
+              />
+
             </div>
           ))}
         </section>
@@ -202,8 +237,10 @@ function RefundsList() {
   const [settling, setSettling] = useState(null)
   const [flash, setFlash] = useState(null)
 
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
   const query = useApiQuery(
-    (signal) => api.admin.refunds.list({ pageSize: 100, ...(status ? { status } : {}) }, signal),
+    (signal) => api.admin.refunds.list({ page, pageSize, ...(status ? { status } : {}) }, signal),
     [status],
   )
   const refresh = useCallback(() => { query.refetch() }, [query])
@@ -273,8 +310,17 @@ function RefundsList() {
                 <tbody>
                   {items.map((refund) => (
                     <tr key={refund.id}>
-                      <td><b>{refund.orderNumber}</b></td>
-                      <td>{refund.buyer.name}<small>{refund.buyer.email}</small></td>
+                      <td>
+                        {refund.orderId
+                          ? <button type="button" className="table-link" onClick={() => navigateTo(`/orders/${refund.orderId}`)}><b>{refund.orderNumber}</b></button>
+                          : <b>{refund.orderNumber}</b>}
+                      </td>
+                      <td>
+                        {refund.buyer.id
+                          ? <button type="button" className="table-link" onClick={() => navigateTo(`/customers/${refund.buyer.id}`)}>{refund.buyer.name}</button>
+                          : refund.buyer.name}
+                        <small>{refund.buyer.email}</small>
+                      </td>
                       <td className="num">{refund.amount.display}</td>
                       <td>{refund.provider.toUpperCase()}</td>
                       <td>
@@ -294,6 +340,15 @@ function RefundsList() {
                   ))}
                 </tbody>
               </table>
+              <Pagination
+                section="fulfil"
+                page={query.data?.pagination?.page ?? page}
+                pageSize={query.data?.pagination?.pageSize ?? pageSize}
+                total={query.data?.pagination?.total ?? 0}
+                onPage={setPage}
+                onPageSize={(size) => { setPageSize(size); setPage(1) }}
+              />
+
             </div>
           ))}
         </section>

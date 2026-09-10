@@ -26,9 +26,148 @@ export function Filters({ section, placeholder, onSearch, children }) {
   </div>
 }
 
+/**
+ * A table whose cells can be doors.
+ *
+ * `firstLink` could only ever make column 0 clickable, and the row's overflow button did the
+ * same thing as clicking that first cell — so a row listing a product, its seller and its
+ * category offered exactly one way in, to the product. Everything else was a dead end: reaching
+ * the seller meant going to Sellers and searching for them by name.
+ *
+ * `links` fixes that without disturbing any existing caller. It maps a column index to a
+ * handler, so a row can lead to several places, and `firstLink` is now just the special case of
+ * `links[0]`.
+ *
+ * `rowActions` renders the overflow button's real contents. Previously it repeated the first
+ * link, which meant destructive actions had nowhere to live and every list grew its own ad-hoc
+ * button column.
+ */
+/**
+ * Server-side pagination.
+ *
+ * Distinct from the pager built into `Table`, which slices an array the page already holds.
+ * That one is fine for a list that arrives complete; it is actively misleading for a list the
+ * API capped, because it pages confidently through a subset and gives no hint that the rest
+ * exists. Every list that filters or pages on the server uses this instead, and takes its
+ * numbers from the response rather than from `rows.length`.
+ *
+ * Renders nothing when everything fits on one page — a pager with one button in it is furniture.
+ */
+export function Pagination({ section = 'admin', page, pageSize, total, onPage, onPageSize }) {
+  const pageCount = Math.max(1, Math.ceil(total / pageSize))
+  const current = Math.min(page, pageCount)
+  if (total === 0) return null
+
+  const first = (current - 1) * pageSize + 1
+  const last = Math.min(current * pageSize, total)
+
+  /**
+   * A window around the current page rather than every page.
+   *
+   * Forty pages of numbered buttons is not navigation. Five around the cursor, with the ends
+   * always reachable, is how far anyone actually clicks.
+   */
+  const windowStart = Math.max(1, Math.min(current - 2, pageCount - 4))
+  const windowEnd = Math.min(pageCount, Math.max(current + 2, 5))
+  const numbers = []
+  for (let index = windowStart; index <= windowEnd; index += 1) numbers.push(index)
+
+  return (
+    <div className={`${section}-pagination pagination`}>
+      <span>Showing {first} to {last} of {total}</span>
+      <div className="pagination-pages">
+        <button type="button" aria-label="Previous page" disabled={current === 1} onClick={() => onPage(current - 1)}>
+          <Icon name="chevron-left" />
+        </button>
+        {windowStart > 1 && (
+          <>
+            <button type="button" onClick={() => onPage(1)}>1</button>
+            {windowStart > 2 && <span className="pagination-gap">…</span>}
+          </>
+        )}
+        {numbers.map((number) => (
+          <button type="button" key={number} className={number === current ? 'active' : ''} aria-current={number === current ? 'page' : undefined} onClick={() => onPage(number)}>
+            {number}
+          </button>
+        ))}
+        {windowEnd < pageCount && (
+          <>
+            {windowEnd < pageCount - 1 && <span className="pagination-gap">…</span>}
+            <button type="button" onClick={() => onPage(pageCount)}>{pageCount}</button>
+          </>
+        )}
+        <button type="button" aria-label="Next page" disabled={current === pageCount} onClick={() => onPage(current + 1)}>
+          <Icon name="chevron-right" />
+        </button>
+      </div>
+      {onPageSize && (
+        <select aria-label="Rows per page" value={pageSize} onChange={(event) => onPageSize(Number(event.target.value))}>
+          <option value="10">10 / page</option>
+          <option value="25">25 / page</option>
+          <option value="50">50 / page</option>
+          <option value="100">100 / page</option>
+        </select>
+      )}
+    </div>
+  )
+}
+
+/**
+ * The row's overflow menu.
+ *
+ * Actions arrive already filtered by the caller's `can(...)`, so an operator is never shown a
+ * control the server would refuse. Anything destructive declares `confirm`, and the menu asks
+ * before doing it — a delete one click deep with no confirmation is how a catalogue loses rows
+ * nobody meant to remove.
+ */
+export function RowActions({ label, actions = [] }) {
+  const [open, setOpen] = useState(false)
+  const visible = actions.filter(Boolean)
+  if (visible.length === 0) return null
+
+  return (
+    <div className="row-actions">
+      <button
+        type="button"
+        className="row-menu"
+        aria-label={`Actions for ${label}`}
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <Icon name="ellipsis" />
+      </button>
+      {open && (
+        <>
+          {/* Clicking anywhere else closes it, which is what every menu on the web does. */}
+          <button type="button" className="row-actions-scrim" aria-hidden="true" tabIndex={-1} onClick={() => setOpen(false)} />
+          <ul className="row-actions-menu">
+            {visible.map((action) => (
+              <li key={action.label}>
+                <button
+                  type="button"
+                  className={action.danger ? 'danger' : ''}
+                  disabled={action.disabled}
+                  onClick={() => {
+                    setOpen(false)
+                    if (action.confirm && !window.confirm(action.confirm)) return
+                    action.onClick()
+                  }}
+                >
+                  {action.icon && <Icon name={action.icon} />} {action.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  )
+}
+
 export function Table({
   section, headers, rows, statusIndex = [], StatusComponent,
-  firstLink = false, linkClass, onFirstClick,
+  firstLink = false, linkClass, onFirstClick, links,
+  rowActions,
   emptyIcon = 'box-open', emptyLabel = 'records',
   paginate = true, paginationVariant = 'buttons', total,
 }) {
@@ -44,14 +183,27 @@ export function Table({
     <table className={`${section}-table`}>
       <thead><tr>{headers.map((header, index) => <th key={`${header}-${index}`}>{header}</th>)}</tr></thead>
       <tbody>{visibleRows.map((row, rowIndex) => <tr key={`${row[0]}-${rowIndex}`}>
-        {row.map((cell, index) => <td key={`${row[0]}-${rowIndex}-${index}`}>
-          {statusIndex.includes(index)
-            ? <StatusComponent value={cell} />
-            : (index === 0 && firstLink)
-              ? <button type="button" className={linkClass} onClick={() => onFirstClick(row)}>{cell}</button>
-              : cell}
-        </td>)}
-        <td><button type="button" className="row-menu" aria-label={`Actions for ${row[0]}`} onClick={() => onFirstClick?.(row)}><Icon name="ellipsis" /></button></td>
+        {row.map((cell, index) => {
+          // `firstLink` is the old spelling of `links[0]`; both are honoured so existing
+          // callers keep working while new ones can open several columns.
+          const open = links?.[index] ?? (index === 0 && firstLink ? onFirstClick : null)
+          return <td key={`${row[0]}-${rowIndex}-${index}`}>
+            {statusIndex.includes(index)
+              ? <StatusComponent value={cell} />
+              : open
+                // An empty cell is not a link. Rendering a clickable blank is worse than
+                // rendering nothing, because it looks like a bug the reader caused.
+                ? (cell == null || cell === '' || cell === '—'
+                  ? cell
+                  : <button type="button" className={linkClass ?? 'table-link'} onClick={() => open(row)}>{cell}</button>)
+                : cell}
+          </td>
+        })}
+        <td>
+          {rowActions
+            ? <RowActions label={row[0]} actions={rowActions(row)} />
+            : <button type="button" className="row-menu" aria-label={`Actions for ${row[0]}`} onClick={() => (links?.[0] ?? onFirstClick)?.(row)}><Icon name="ellipsis" /></button>}
+        </td>
       </tr>)}</tbody>
     </table>
     {paginate && (paginationVariant === 'buttons' ? (

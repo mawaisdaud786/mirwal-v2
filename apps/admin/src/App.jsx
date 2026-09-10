@@ -26,10 +26,17 @@ const AdminErrorPage = lazy(() => import('./pages/AdminErrorPage'))
 const AdminPage = lazy(() => import('./pages/AdminPage'))
 const AdminAnalytics = lazy(() => import('./pages/AdminAnalytics'))
 const AdminProducts = lazy(() => import('./pages/AdminProducts'))
+const AdminProductDetail = lazy(() => import('./pages/AdminProductDetail'))
 const AdminCategories = lazy(() => import('./pages/AdminCategories'))
+const AdminTaxonomyDetail = lazy(() => import('./pages/AdminTaxonomyDetail'))
 const AdminMarketplacePage = lazy(() => import('./pages/AdminMarketplacePages'))
 const AdminSellerPages = lazy(() => import('./pages/AdminSellerPages'))
+const AdminApplications = lazy(() => import('./pages/AdminApplications'))
+const AdminReviewModeration = lazy(() => import('./pages/AdminReviewModeration'))
+const AdminCases = lazy(() => import('./pages/AdminCases'))
+const AdminReturnDisputes = lazy(() => import('./pages/AdminReturnDisputes'))
 const AdminCustomerPages = lazy(() => import('./pages/AdminCustomerPages'))
+const AdminCustomerDetail = lazy(() => import('./pages/AdminCustomerDetail'))
 const AdminOrderPages = lazy(() => import('./pages/AdminOrderPages'))
 const AdminAIPages = lazy(() => import('./pages/AdminAIPages'))
 const AdminFinancePages = lazy(() => import('./pages/AdminFinancePages'))
@@ -104,24 +111,32 @@ function AdminApp() {
       <Route path="/platform-settings/*" element={<AdminSettingsForm category="all" />} />
       <Route path="/promotions" element={<AdminMarketingPages type="promotions" />} />
       <Route path="/promotions/new" element={<AdminMarketingPages type="promotions" create />} />
+      <Route path="/promotions/:id" element={<AdminMarketingPages type="promotions" create />} />
       <Route path="/products" element={<AdminProducts />} />
       <Route path="/products/new" element={<AdminProducts create />} />
+      <Route path="/products/:id" element={<AdminProductDetail />} />
       <Route path="/categories" element={<AdminCategories />} />
       <Route path="/categories/new" element={<AdminCategories create />} />
+      <Route path="/categories/:slug" element={<AdminTaxonomyDetail kind="categories" />} />
       <Route path="/brands" element={<AdminMarketplacePage type="brands" />} />
+      <Route path="/brands/:slug" element={<AdminTaxonomyDetail kind="brands" />} />
       <Route path="/attributes" element={<AdminOperationsPages view="attributes" />} />
       <Route path="/inventory" element={<AdminMarketplacePage type="inventory" />} />
       <Route path="/product-approvals" element={<AdminMarketplacePage type="approvals" />} />
       <Route path="/product-reports" element={<AdminOperationsPages view="reports" />} />
       <Route path="/sellers" element={<AdminSellerPages type="sellers" />} />
       <Route path="/sellers/*" element={<AdminSellerPages detail />} />
-      <Route path="/seller-applications" element={<AdminSellerPages type="applications" />} />
+      {/* Applications are their own resource now: a store is created *by* an approval, so the
+          old `GET /sellers?status=pending` queue could only ever be empty in production. */}
+      <Route path="/seller-applications" element={<AdminApplications />} />
       <Route path="/verification" element={<AdminVerification />} />
       <Route path="/seller-performance" element={<AdminOperationsPages view="performance" />} />
       <Route path="/payouts" element={<AdminPayouts />} />
       <Route path="/customers" element={<AdminCustomerPages />} />
-      <Route path="/customers/*" element={<AdminCustomerPages detail />} />
-      <Route path="/reviews" element={<AdminCustomerPages type="reviews" />} />
+      <Route path="/customers/:id" element={<AdminCustomerDetail />} />
+      {/* Was a read-only list: a review had no status, so a defamatory or fake one could
+          not be taken down at all. */}
+      <Route path="/reviews" element={<AdminReviewModeration />} />
       {/* The support queue: the staff side of the tickets sellers and customers open. */}
       <Route path="/complaints" element={<AdminSupportQueue />} />
       <Route path="/support" element={<AdminSupportQueue />} />
@@ -129,6 +144,11 @@ function AdminApp() {
       <Route path="/blocked-accounts" element={<AdminOperationsPages view="blocked" />} />
       <Route path="/orders" element={<AdminOrderPages />} />
       <Route path="/orders/*" element={<AdminOrderPages detail mode="order" />} />
+      {/* Was a read-only SELECT over return requests with no action on it. Cases are where
+          product, seller, counterfeit and payment reports now land. */}
+      <Route path="/cases" element={<AdminCases />} />
+      {/* Distinct from the read-only /disputes overview: this is where Mirwal actually decides. */}
+      <Route path="/return-disputes" element={<AdminReturnDisputes />} />
       <Route path="/disputes" element={<AdminOrderPages type="disputes" />} />
       <Route path="/disputes/*" element={<AdminFulfilmentPages detail />} />
       <Route path="/returns" element={<AdminFulfilmentPages view="returns" />} />
@@ -165,7 +185,7 @@ function AdminApp() {
       <Route path="/coupons/*" element={<AdminMarketingPages type="coupons" detail />} />
       <Route path="/stores" element={<AdminStorePages />} />
       <Route path="/stores/*" element={<AdminStorePages detail />} />
-      <Route path="/store-applications" element={<AdminSellerPages type="applications" />} />
+      <Route path="/store-applications" element={<AdminApplications />} />
       <Route path="/maintenance" element={<AdminPlatformPages view="maintenance" />} />
       <Route path="/maintenance/*" element={<AdminPlatformPages view="maintenance" />} />
       <Route path="/backup" element={<AdminPlatformPages view="backup" />} />

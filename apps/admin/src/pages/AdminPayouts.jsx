@@ -3,6 +3,9 @@ import AdminLayout from './AdminLayout'
 import { EmptyState, ErrorState, LoadingState } from './AdminStates'
 import { useApiQuery, describeApiError } from '@mirwal/shared/useApiQuery'
 import Icon from '@mirwal/shared/Icon'
+import { Pagination } from './AdminComponents'
+import { useAdminSession } from '../AdminSession'
+import { navigateTo } from '@mirwal/shared/navigation'
 import api from '../api'
 import './seller-pages.css'
 
@@ -39,10 +42,22 @@ export default function AdminPayouts() {
   const [busy, setBusy] = useState(null)
   const [flash, setFlash] = useState(null)
 
+  // Approving, paying and rejecting all move money, so they are gated the way the route is.
+  const { can } = useAdminSession()
+  const canDecide = can('settings.manage')
+
   const stats = useApiQuery((signal) => api.admin.payouts.stats(signal), [])
+  /**
+   * Paged rather than capped at fifty.
+   *
+   * A fixed `pageSize: 50` is a cap dressed as a page: the fifty-first withdrawal request was
+   * unreachable, and nothing on screen said so.
+   */
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
   const list = useApiQuery(
-    (signal) => api.admin.payouts.list({ pageSize: 50, ...(status ? { status } : {}) }, signal),
-    [status],
+    (signal) => api.admin.payouts.list({ page, pageSize, ...(status ? { status } : {}) }, signal),
+    [status, page, pageSize],
   )
   const refresh = useCallback(() => { list.refetch(); stats.refetch() }, [list, stats])
 
@@ -114,7 +129,7 @@ export default function AdminPayouts() {
 
           <div className="seller-tabs">
             {STATUS_TABS.map(([value, label]) => (
-              <button type="button" key={label} className={status === value ? 'active' : ''} onClick={() => setStatus(value)}>
+              <button type="button" key={label} className={status === value ? 'active' : ''} onClick={() => { setStatus(value); setPage(1) }}>
                 {label}
               </button>
             ))}
@@ -135,6 +150,7 @@ export default function AdminPayouts() {
               description={status ? `No ${status} payouts.` : 'Sellers request withdrawals from their own portal; those requests arrive here for approval.'}
             />
           ) : (
+            <>
             <div className="seller-table-wrap">
               <table className="seller-table">
                 <thead>
@@ -150,7 +166,13 @@ export default function AdminPayouts() {
                         <code>{payout.reference}</code>
                         {payout.externalReference && <small>bank ref {payout.externalReference}</small>}
                       </td>
-                      <td>{payout.seller?.name ?? '—'}</td>
+                      <td>
+                        {/* The store is a door: a payout is a question about a seller, and
+                            reaching them meant going to Sellers and searching by name. */}
+                        {payout.seller?.id
+                          ? <button type="button" className="table-link" onClick={() => navigateTo(`/sellers/${payout.seller.id}`)}>{payout.seller.name}</button>
+                          : (payout.seller?.name ?? '—')}
+                      </td>
                       <td>{payout.itemCount ?? '—'}</td>
                       <td>{payout.grossAmount?.display ?? '—'}</td>
                       <td>{payout.commissionAmount?.display ?? '—'}</td>
@@ -162,7 +184,7 @@ export default function AdminPayouts() {
                       <td>{formatDate(payout.requestedAt)}</td>
                       <td className="seller-row-actions">
                         {/* Only transitions the server will accept are offered. */}
-                        {payout.status === 'requested' && (
+                        {canDecide && payout.status === 'requested' && (
                           <>
                             <button type="button" className="approve" disabled={busy === payout.id} onClick={() => approve(payout)}>
                               {busy === payout.id ? '...' : 'Approve'}
@@ -170,18 +192,28 @@ export default function AdminPayouts() {
                             <button type="button" className="reject" disabled={busy === payout.id} onClick={() => reject(payout)}>Reject</button>
                           </>
                         )}
-                        {(payout.status === 'approved' || payout.status === 'processing') && (
+                        {canDecide && (payout.status === 'approved' || payout.status === 'processing') && (
                           <button type="button" className="approve" disabled={busy === payout.id} onClick={() => markPaid(payout)}>
                             {busy === payout.id ? '...' : 'Mark paid'}
                           </button>
                         )}
-                        {['paid', 'rejected', 'failed'].includes(payout.status) && <span className="seller-muted">—</span>}
+                        {(!canDecide || ['paid', 'rejected', 'failed'].includes(payout.status)) && <span className="seller-muted">—</span>}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+
+            <Pagination
+              section="seller"
+              page={list.data?.pagination?.page ?? page}
+              pageSize={list.data?.pagination?.pageSize ?? pageSize}
+              total={list.data?.pagination?.total ?? 0}
+              onPage={setPage}
+              onPageSize={(size) => { setPageSize(size); setPage(1) }}
+            />
+            </>
           ))}
 
           <p className="seller-footnote">
