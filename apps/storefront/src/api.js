@@ -68,6 +68,7 @@ export const api = {
    */
   shipping: {
     quote: (params, signal) => request(`/shipping/quote${buildQuery(params)}`, { signal, auth: false }),
+    zones: (signal) => request('/shipping/zones', { signal, auth: false }),
   },
 
   products: {
@@ -79,6 +80,16 @@ export const api = {
     list: (params, signal) => request(`/products${buildQuery(params)}`, { signal }),
     get: (slug, signal) => request(`/products/${encodeURIComponent(slug)}`, { signal }),
     facets: (signal) => request('/products/facets', { signal }),
+    /**
+     * Report a listing.
+     *
+     * This endpoint has been live, tested and correct since migration 016 — and completely
+     * unreachable, because no client method existed and no page called it. Accepts anonymous
+     * reports, which is why `auth: false`.
+     */
+    report: (slug, payload) => request(`/products/${encodeURIComponent(slug)}/report`, {
+      method: 'POST', body: payload, auth: false, envelope: true,
+    }),
   },
 
   categories: {
@@ -100,8 +111,46 @@ export const api = {
     create: (payload) => request('/orders', { method: 'POST', body: payload }),
     list: (signal) => request('/orders', { signal }),
     get: (id, signal) => request(`/orders/${encodeURIComponent(id)}`, { signal }),
-    cancelItem: (itemId) => request(`/orders/items/${encodeURIComponent(itemId)}/cancel`, { method: 'PATCH' }),
-    requestReturn: (itemId, payload) => request(`/orders/items/${encodeURIComponent(itemId)}/return-request`, { method: 'POST', body: payload }),
+    // Validates a promo code against the current cart and returns what it is worth, so the
+    // summary can show the discount before the order is placed rather than after.
+    previewCoupon: (code, items) => request('/orders/coupons/preview', { method: 'POST', body: { code, items } }),
+    // `payload` may carry a quantity to cancel part of a line; without one the whole line goes.
+    cancelItem: (itemId, payload) => request(`/orders/items/${encodeURIComponent(itemId)}/cancel`, { method: 'PATCH', body: payload, envelope: true }),
+    requestReturn: (itemId, payload) => request(`/orders/items/${encodeURIComponent(itemId)}/return-request`, { method: 'POST', body: payload, envelope: true }),
+  },
+
+  /**
+   * Returns, after they have been filed.
+   *
+   * A return used to be a status printed next to an order line and nothing more. It now has a
+   * life of its own — the seller may ask for a photograph, the buyer posts the item back, the
+   * refund may be partial — and, most importantly, `escalate` exists: a buyer who thinks a
+   * rejection is wrong can bring Mirwal in rather than being told the seller has decided.
+   */
+  /**
+   * After the order is placed.
+   *
+   * `invoice` is the tax document — issued once the order is paid and never rewritten
+   * afterwards. `messages` reaches the store holding the parcel rather than Mirwal, which is the
+   * thing that did not exist at all. Cancelling stays on `orders.cancelItem` above, which now
+   * accepts a quantity.
+   */
+  fulfilment: {
+    invoice: (orderId, signal) => request(`/orders/${encodeURIComponent(orderId)}/invoice`, { signal }),
+    threads: (orderId, signal) => request(`/orders/${encodeURIComponent(orderId)}/messages`, { signal }),
+    thread: (orderId, sellerId, signal) =>
+      request(`/orders/${encodeURIComponent(orderId)}/messages/${encodeURIComponent(sellerId)}`, { signal }),
+    send: (orderId, sellerId, body) =>
+      request(`/orders/${encodeURIComponent(orderId)}/messages/${encodeURIComponent(sellerId)}`, { method: 'POST', body: { body }, envelope: true }),
+  },
+
+  returns: {
+    list: (signal) => request('/orders/returns/mine', { signal }),
+    get: (id, signal) => request(`/orders/returns/${encodeURIComponent(id)}`, { signal }),
+    cancel: (id) => request(`/orders/returns/${encodeURIComponent(id)}/cancel`, { method: 'POST', envelope: true }),
+    markPosted: (id, body) => request(`/orders/returns/${encodeURIComponent(id)}/posted`, { method: 'POST', body, envelope: true }),
+    escalate: (id, note) => request(`/orders/returns/${encodeURIComponent(id)}/escalate`, { method: 'POST', body: { note }, envelope: true }),
+    reply: (id, body) => request(`/orders/returns/${encodeURIComponent(id)}/messages`, { method: 'POST', body: { body }, envelope: true }),
   },
 
   ai: {
@@ -146,9 +195,22 @@ export const api = {
     methods: (signal) => request('/payments/methods', { signal }),
     start: (orderId, method) => request(`/payments/orders/${encodeURIComponent(orderId)}/start`, { method: 'POST', body: { method } }),
     status: (orderId, signal) => request(`/payments/orders/${encodeURIComponent(orderId)}/status`, { signal }),
+    // The endpoint has existed since migration 008 and nothing called it, so a buyer could
+    // never see whether their refund had actually been paid.
+    refunds: (signal) => request('/payments/refunds', { signal }),
   },
 
   notifications: {
+    /**
+     * What reaches this person, and how.
+     *
+     * The categories come from the server rather than being invented here — the old panel
+     * toggled five keys taken from an icon lookup table, which is why none of them did
+     * anything.
+     */
+    preferences: (signal) => request('/notifications/preferences', { signal }),
+    setPreferences: (body) => request('/notifications/preferences', { method: 'PUT', body, envelope: true }),
+
     list: (signal) => request('/notifications', { signal }),
     markRead: (id) => request(`/notifications/${encodeURIComponent(id)}/read`, { method: 'PATCH' }),
     markAllRead: () => request('/notifications/read-all', { method: 'PATCH' }),
@@ -159,6 +221,53 @@ export const api = {
     create: (payload) => request('/addresses', { method: 'POST', body: payload }),
     update: (id, payload) => request(`/addresses/${encodeURIComponent(id)}`, { method: 'PUT', body: payload }),
     remove: (id) => request(`/addresses/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  },
+
+  /**
+   * Confirming an email address and a mobile number.
+   *
+   * `confirmEmailLink` deliberately sends no token of its own — the link's token IS the proof,
+   * and it is clicked from an inbox that is frequently not the browser the account was created
+   * in. Requiring a session there would make the link fail for the people most likely to use it.
+   */
+  verification: {
+    status: (signal) => request('/auth/me/verification', { signal }),
+    request: (purpose) => request('/auth/me/verification/request', { method: 'POST', body: { purpose }, envelope: true }),
+    confirm: (purpose, code) => request('/auth/me/verification/confirm', { method: 'POST', body: { purpose, code }, envelope: true }),
+    confirmEmailLink: (token) => request('/auth/verify/confirm-email', { method: 'POST', body: { token }, auth: false, envelope: true }),
+  },
+
+  /**
+   * Becoming a seller.
+   *
+   * Mounted at /sell rather than /seller because an applicant is a signed-in customer, not yet
+   * a seller — the seller namespace would refuse them at the door.
+   */
+  sell: {
+    requirements: (signal) => request('/sell/requirements', { signal }),
+    application: (signal) => request('/sell/application', { signal }),
+    apply: (payload) => request('/sell/application', { method: 'POST', body: payload, envelope: true }),
+    update: (payload) => request('/sell/application', { method: 'PUT', body: payload, envelope: true }),
+    withdraw: () => request('/sell/application/withdraw', { method: 'POST', envelope: true }),
+  },
+
+  /**
+   * Trust and safety.
+   *
+   * `report` works signed out on purpose: the shopper who spots a counterfeit is often not
+   * logged in, and refusing their report loses the signal entirely.
+   */
+  safety: {
+    report: (payload) => request('/safety/reports', { method: 'POST', body: payload, auth: false, envelope: true }),
+    myReports: (params, signal) => request(`/safety/reports/mine${buildQuery(params)}`, { signal }),
+    reportReview: (id, payload) => request(`/safety/reviews/${encodeURIComponent(id)}/report`, { method: 'POST', body: payload, auth: false, envelope: true }),
+    voteHelpful: (id) => request(`/safety/reviews/${encodeURIComponent(id)}/helpful`, { method: 'POST', envelope: true }),
+  },
+
+  /** Parcels and the order timeline. */
+  tracking: {
+    forOrder: (orderId, signal) => request(`/orders/${encodeURIComponent(orderId)}/tracking`, { signal }),
+    timeline: (orderId, signal) => request(`/orders/${encodeURIComponent(orderId)}/timeline`, { signal }),
   },
 }
 

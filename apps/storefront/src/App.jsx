@@ -29,6 +29,7 @@ const CartPage = lazy(() => import('./CartPage'))
 const CheckoutPage = lazy(() => import('./CheckoutPage'))
 const AuthPage = lazy(() => import('./AuthPage'))
 const ResetPasswordPage = lazy(() => import('./ResetPasswordPage'))
+const VerifyEmailPage = lazy(() => import('./VerifyEmailPage'))
 const DealsPage = lazy(() => import('./DealsPage'))
 const ComparePage = lazy(() => import('./ComparePage'))
 const StorePage = lazy(() => import('./StorePage'))
@@ -75,7 +76,7 @@ function RequireRole({ role }) {
   return hasRole(role) ? <Outlet /> : <Navigate to="/404" replace />
 }
 
-const accountPaths = ['/my-chats', '/profile', '/orders', '/track-orders', '/wishlist', '/recently-viewed', '/saved-searches', '/addresses', '/payment-methods', '/notifications', '/security', '/settings', '/logout']
+const accountPaths = ['/my-chats', '/profile', '/orders', '/my-returns', '/track-orders', '/wishlist', '/recently-viewed', '/saved-searches', '/addresses', '/payment-methods', '/notifications', '/security', '/settings', '/logout', '/compare-history']
 
 function ProductPageRoute({ cartCount, onAddToCart }) {
   const { id, productSlug } = useParams()
@@ -178,13 +179,20 @@ function App() {
   const cartCount = cartItems.reduce((count, item) => count + item.quantity, 0)
   // Normalises both the API product shape and the remaining legacy mock shape into one
   // canonical cart item, so the cart never has to parse a display string. See lib/money.js.
-  const addToCart = (item, quantity = 1) => {
+  /**
+   * `silent` suppresses the confirmation modal.
+   *
+   * Buy Now adds the item and navigates straight to checkout; without this the "Added to
+   * cart!" dialog follows the shopper onto the checkout page and sits on top of the form they
+   * were sent there to fill in.
+   */
+  const addToCart = (item, quantity = 1, { silent = false } = {}) => {
     const cartItem = toCartItem(item, quantity)
     setCartItems((items) => items.some((existing) => existing.id === cartItem.id)
       ? items.map((existing) => existing.id === cartItem.id ? { ...existing, quantity: existing.quantity + quantity } : existing)
       : [...items, cartItem])
     setCartMessage(`${cartItem.name} added to cart`)
-    setModal({ type: 'cart', product: cartItem })
+    if (!silent) setModal({ type: 'cart', product: cartItem })
     window.setTimeout(() => setCartMessage(''), 2400)
   }
   const changeQuantity = (id, quantity) => setCartItems((items) => items.map((item) => item.id === id ? { ...item, quantity: Math.max(1, quantity) } : item))
@@ -207,6 +215,10 @@ function App() {
           <Route path="/register" element={<AuthPage initialMode="signup" />} />
           {/* Reached from the emailed link; the token travels in the query string. */}
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          {/* Where the email confirmation link lands. In the no-chrome layout beside the other
+              token pages, and outside every session guard: the link is clicked from an inbox,
+              frequently in a browser with no Mirwal session, and the token is the proof. */}
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
         </Route>
 
         {/* AI ASSISTANT — header without nav, no footer */}

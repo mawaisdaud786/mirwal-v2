@@ -576,6 +576,92 @@ function TrustSection() {
   )
 }
 
+/**
+ * Report this listing.
+ *
+ * `POST /products/:slug/report` has existed since migration 016 — well built, tested, and
+ * completely unreachable, because no client method called it and no page rendered a control.
+ * A reporting endpoint nobody can reach is the same as no reporting endpoint.
+ *
+ * Deliberately available to signed-out visitors, matching the endpoint: the shopper who spots
+ * a counterfeit is very often not logged in, and asking them to create an account first loses
+ * the report.
+ */
+function ReportListing({ slug }) {
+  const [open, setOpen] = useState(false)
+  const [reason, setReason] = useState('')
+  const [details, setDetails] = useState('')
+  const [state, setState] = useState({ status: 'idle', message: null })
+
+  const REASONS = [
+    ['counterfeit', 'Counterfeit or fake branded item'],
+    ['misleading', 'Misleading title, photos or description'],
+    ['prohibited', 'Something that should not be sold here'],
+    ['wrong_category', 'Listed in the wrong category'],
+    ['price', 'The price or discount is wrong'],
+    ['offensive', 'Offensive content'],
+    ['other', 'Something else'],
+  ]
+
+  async function submit(event) {
+    event.preventDefault()
+    setState({ status: 'sending', message: null })
+    try {
+      await api.products.report(slug, { reason, details: details || undefined })
+      setState({ status: 'sent', message: null })
+    } catch (error) {
+      setState({ status: 'idle', message: describeApiError(error) })
+    }
+  }
+
+  if (state.status === 'sent') {
+    return (
+      <div className="report-listing sent" role="status">
+        <FaIcon name="circle-check" />
+        <p>Thank you — Mirwal will review this listing.</p>
+      </div>
+    )
+  }
+
+  if (!open) {
+    return (
+      <button type="button" className="report-listing-trigger" onClick={() => setOpen(true)}>
+        <FaIcon name="flag" /> Report this listing
+      </button>
+    )
+  }
+
+  return (
+    <form className="report-listing" onSubmit={submit}>
+      <h3><FaIcon name="flag" /> Report this listing</h3>
+      <p>Tell us what is wrong. Reports are reviewed by Mirwal and are not shown to the seller.</p>
+      <label>
+        <span>What is the problem?</span>
+        <select required value={reason} onChange={(event) => setReason(event.target.value)}>
+          <option value="" disabled>Choose a reason</option>
+          {REASONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+      </label>
+      <label>
+        <span>Anything else? (optional)</span>
+        <textarea
+          value={details}
+          onChange={(event) => setDetails(event.target.value)}
+          maxLength={2000}
+          placeholder="Only the details we need to investigate."
+        />
+      </label>
+      {state.message && <p className="report-listing-error" role="alert">{state.message}</p>}
+      <div className="report-listing-actions">
+        <button type="button" onClick={() => setOpen(false)}>Cancel</button>
+        <button type="submit" disabled={state.status === 'sending' || !reason}>
+          {state.status === 'sending' ? 'Sending…' : 'Submit report'}
+        </button>
+      </div>
+    </form>
+  )
+}
+
 export default function ProductPage({ product, onAddToCart }) {
   const { addProduct } = useComparison()
   const images = product.images.length > 0 ? product.images : [{ url: null, alt: product.name }]
@@ -639,7 +725,7 @@ export default function ProductPage({ product, onAddToCart }) {
     } : {}),
   }), [product, price, inStock, variant])
 
-  const addToCart = () => onAddToCart?.({
+  const addToCart = (options) => onAddToCart?.({
     id: product.id,
     slug: product.slug,
     name: product.name,
@@ -651,7 +737,27 @@ export default function ProductPage({ product, onAddToCart }) {
     // comparing amounts — a variant with its own price has no "was" value to compare to.
     compareAtPrice: price.amount === product.price.amount ? product.compareAtPrice : null,
     variantSku: variant?.sku,
-  }, quantity)
+  }, quantity, options)
+
+  /**
+   * Buy Now.
+   *
+   * Was a button with no handler at all — it rendered, it was enabled whenever stock allowed,
+   * and clicking it did nothing.
+   *
+   * It adds to the cart and goes straight to checkout rather than being a separate
+   * single-item purchase path. That keeps one checkout to maintain, and means a shopper who
+   * changes their mind at the payment step still has the item where they expect to find it
+   * instead of losing it.
+   *
+   * Checkout is behind `RequireRole('customer')`, which sends a signed-out shopper to /login
+   * and returns them here afterwards — so no sign-in check is needed at this point.
+   */
+  const buyNow = () => {
+    // Silent: the confirmation modal would follow the shopper onto checkout and cover the form.
+    addToCart({ silent: true })
+    navigateTo('/checkout')
+  }
 
   return (
     <main className="container product-detail">
@@ -777,10 +883,10 @@ export default function ProductPage({ product, onAddToCart }) {
             </div>
 
             <div className="purchase-buttons">
-              <button type="button" className="buy-primary" disabled={!inStock} onClick={addToCart}>
+              <button type="button" className="buy-primary" disabled={!inStock} onClick={() => addToCart()}>
                 <FaIcon name="cart-shopping" /> Add to Cart
               </button>
-              <button type="button" className="buy-secondary" disabled={!inStock}>
+              <button type="button" className="buy-secondary" disabled={!inStock} onClick={buyNow}>
                 Buy Now
               </button>
             </div>
@@ -796,6 +902,8 @@ export default function ProductPage({ product, onAddToCart }) {
                 </button>
               </div>
             )}
+
+            <ReportListing slug={product.slug} />
           </aside>
         </div>
       </section>

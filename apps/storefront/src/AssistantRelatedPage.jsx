@@ -39,7 +39,7 @@ const pageContent = {
   '/wishlist': { icon: 'heart', heading: 'Wishlist', title: 'Wishlist isn’t connected yet', description: 'A wishlist needs a real account to save items to, which isn’t wired up yet.' },
   '/recently-viewed': { icon: 'clock-rotate-left', heading: 'Recently Viewed' },
   '/saved-searches': { icon: 'magnifying-glass', heading: 'Saved Searches', title: 'Saved searches aren’t connected yet', description: 'Saving a search needs a real account, which isn’t wired up yet.' },
-  '/profile': { icon: 'circle-user', heading: 'Profile' },
+  '/profile': { icon: 'circle-user', heading: 'Your Profile', description: 'Keep your information up to date for a better and more personalized shopping experience.' },
   '/settings': { icon: 'gear', heading: 'Settings', title: 'Settings aren’t connected yet', description: 'Shopping and assistant preferences need a real account to save to, which isn’t wired up yet.' },
 }
 
@@ -69,7 +69,7 @@ function NotConnected({ icon, title, description }) {
 }
 
 /** The real, server-stored wishlist for the signed-in shopper (server/src/modules/wishlist). */
-function WishlistContent() {
+function WishlistContent({ onAddToCart }) {
   const { items, isSignedIn } = useWishlist()
   if (!isSignedIn) {
     return <NotConnected icon="heart" title="Sign in to see your wishlist" description="Your wishlist is saved to your account, so it follows you to any device." />
@@ -77,12 +77,7 @@ function WishlistContent() {
   if (!items.length) {
     return <NotConnected icon="heart" title="Your wishlist is empty" description="Tap the heart on any product to save it here." />
   }
-  return <section className="assistant-related-grid" aria-label="Wishlist">
-    {items.map((product) => <div className="wishlist-tile" key={product.id}>
-      <ProductTile product={product} />
-      <WishlistHeart product={product} className="wishlist-tile-heart" savedClassName="is-saved" />
-    </div>)}
-  </section>
+  return <div className="wishlist-dashboard"><section className="wishlist-hero"><div><h1>Your <em>Wishlist</em></h1><p>Saved today. A smarter tomorrow.<br />Keep your favorite products in one place.</p></div><FaIcon name="heart" /></section><div className="wishlist-body"><section className="wishlist-items"><div className="wishlist-toolbar"><b>All Items ({items.length})</b><span>Recently Added</span><label>Sort by <select defaultValue="newest"><option value="newest">Newest First</option><option value="name">Name</option><option value="price">Price</option></select></label><button type="button" aria-label="Grid view"><FaIcon name="grip" /></button><button type="button" aria-label="List view"><FaIcon name="list" /></button></div><div className="assistant-related-grid" aria-label="Wishlist">{items.map((product) => <div className="wishlist-tile" key={product.id}><ProductTile product={product} /><WishlistHeart product={product} className="wishlist-tile-heart" savedClassName="is-saved" /><button className="wishlist-add-cart" type="button" disabled={product.availability?.inStock === false} onClick={() => onAddToCart?.(product)}><FaIcon name="cart-shopping" /> Add to cart</button></div>)}</div></section><aside className="wishlist-summary"><h2><FaIcon name="heart" /> Wishlist Summary</h2><p>Total Items <b>{items.length}</b></p><p>Saved for later <b>{items.length}</b></p><button type="button" onClick={() => items.forEach((product) => onAddToCart?.(product))}><FaIcon name="cart-shopping" /> Move All to Cart</button></aside></div></div>
 }
 
 
@@ -107,7 +102,16 @@ function ProfileContent() {
     return <NotConnected icon="circle-user" title="Sign in to view your profile" description="Your profile details are tied to your Mirwal account." />
   }
 
-  const values = form ?? { fullName: user.fullName ?? '', phone: user.phone ?? '' }
+  const values = form ?? {
+    fullName: user.fullName ?? '',
+    phone: user.phone ?? '',
+    city: user.city ?? '',
+    country: user.country ?? 'Pakistan',
+    language: user.language ?? 'English',
+    address: user.address ?? '',
+  }
+  const completionFields = [values.fullName, user.email, values.phone, values.address, values.language]
+  const completion = Math.round((completionFields.filter(Boolean).length / completionFields.length) * 100)
   const change = (key) => (event) => { setForm({ ...values, [key]: event.target.value }); setSaved(false) }
 
   const submit = async (event) => {
@@ -125,26 +129,78 @@ function ProfileContent() {
   }
 
   return (
-    <form className="assistant-related-form" onSubmit={submit}>
+    <div className="profile-dashboard">
+      <div className="profile-main-column">
+        <form className="assistant-related-form profile-personal-card" onSubmit={submit}>
+          <div className="profile-section-heading"><span><FaIcon name="user" /></span><div><h2>Personal Information</h2><p>Tell us about yourself.</p></div></div>
+      <div className="profile-form-grid">
+        <label>
+          Full name
+          <input value={values.fullName} onChange={change('fullName')} maxLength={150} required />
+        </label>
+        <label>
+          Phone number
+          <input value={values.phone} onChange={change('phone')} maxLength={20} placeholder="+92 300 1234567" />
+        </label>
+      </div>
+
+      <div className="profile-form-grid">
+        <label>
+          City
+          <input value={values.city} onChange={change('city')} maxLength={80} placeholder="Lahore" />
+        </label>
+        <label>
+          Country
+          <select value={values.country} onChange={change('country')}>
+            <option value="Pakistan">Pakistan</option>
+            <option value="United Arab Emirates">United Arab Emirates</option>
+            <option value="Saudi Arabia">Saudi Arabia</option>
+            <option value="United Kingdom">United Kingdom</option>
+            <option value="United States">United States</option>
+          </select>
+        </label>
+      </div>
+
+      <div className="profile-form-grid">
+        <label>
+          Preferred language
+          <select value={values.language} onChange={change('language')}>
+            <option value="English">English</option>
+            <option value="Urdu">Urdu</option>
+            <option value="Arabic">Arabic</option>
+          </select>
+        </label>
+        <label>
+          Email address
+          <input value={user.email} readOnly disabled />
+        </label>
+      </div>
+
       <label>
-        Full name
-        <input value={values.fullName} onChange={change('fullName')} maxLength={150} required />
+        Default delivery address
+        <textarea value={values.address} onChange={change('address')} rows={3} placeholder="House 12, Gulberg, Lahore" />
       </label>
-      <label>
-        Phone
-        <input value={values.phone} onChange={change('phone')} maxLength={20} placeholder="+92 300 1234567" />
-      </label>
-      <label>
-        Email address
-        <input value={user.email} readOnly disabled />
-        <small className="profile-field-note">Your email identifies your account and can’t be changed here yet.</small>
-      </label>
+
+      <small className="profile-field-note">Your email identifies your account and can’t be changed here yet.</small>
       {error && <p className="profile-form-error">{error}</p>}
       {saved && <p className="profile-form-saved"><FaIcon name="circle-check" /> Profile saved.</p>}
       <button className="assistant-related-action" type="submit" disabled={saving}>
         {saving ? 'Saving…' : 'Save changes'}
       </button>
-    </form>
+        </form>
+
+        <div className="profile-bottom-cards">
+          <section className="profile-mini-card"><h3><FaIcon name="location-dot" /> Shipping Address</h3><p>Set your default shipping address for faster checkout.</p><button type="button" onClick={() => navigate('/addresses?add=1')}><FaIcon name="plus" /> Add Shipping Address</button></section>
+          <section className="profile-mini-card"><h3><FaIcon name="credit-card" /> Payment Methods</h3><p>Add and manage your payment methods.</p><button type="button" onClick={() => navigate('/payment-methods?add=1')}><FaIcon name="plus" /> Add Payment Method</button></section>
+          <section className="profile-mini-card"><h3><FaIcon name="bell" /> Communication Preferences</h3><p>Choose what you want to hear from us.</p><label><input type="checkbox" defaultChecked /> Order updates</label><label><input type="checkbox" defaultChecked /> Deals & offers</label><label><input type="checkbox" defaultChecked /> News & recommendations</label></section>
+        </div>
+      </div>
+
+      <aside className="profile-right-rail">
+        <section className="profile-completion"><h3><FaIcon name="user" /> Account Completion</h3><div className="profile-completion-score"><strong style={{ '--profile-completion': `${completion}%` }}>{completion}%</strong><span><b>{completion >= 80 ? 'Your profile is almost complete!' : 'Complete your profile'}</b><small>Add missing information to get a better experience.</small></span></div><ul><li className={values.fullName ? 'is-complete' : ''}>Basic Information</li><li className="is-complete">Email Verified</li><li className={values.phone ? 'is-complete' : ''}>Phone Number</li><li className={values.address ? 'is-complete' : ''}>Add Address</li><li>Add Payment Method</li><li>Verify CNIC (Optional)</li></ul></section>
+        <section className="profile-quick-actions"><h3><FaIcon name="bolt" /> Quick Actions</h3><button type="button" onClick={() => navigate('/addresses')}><FaIcon name="location-dot" /> Manage Addresses <FaIcon name="chevron-right" /></button><button type="button" onClick={() => navigate('/payment-methods')}><FaIcon name="credit-card" /> Payment Methods <FaIcon name="chevron-right" /></button><button type="button" onClick={() => navigate('/security')}><FaIcon name="shield-halved" /> Security Settings <FaIcon name="chevron-right" /></button><button type="button" onClick={() => navigate('/notifications')}><FaIcon name="bell" /> Notification Preferences <FaIcon name="chevron-right" /></button></section>
+      </aside>
+    </div>
   )
 }
 
@@ -162,15 +218,15 @@ function RecentlyViewedContent() {
   return <section className="assistant-related-grid" aria-label="Recently viewed">{items.map((product) => <ProductTile key={product.id} product={product} />)}</section>
 }
 
-export function AssistantRelatedContent({ path }) {
+export function AssistantRelatedContent({ path, onAddToCart }) {
   const content = pageContent[path] || pageContent['/my-chats']
   return <>
-    <section className="assistant-related-heading">
+    <section className={`assistant-related-heading${path === '/wishlist' ? ' wishlist-generic-heading' : ''}`}>
       <span><FaIcon name={content.icon} /></span>
-      <div><h1>{content.heading}</h1></div>
+      <div><h1>{content.heading}</h1>{content.description && <p>{content.description}</p>}</div>
     </section>
     {path === '/recently-viewed' ? <RecentlyViewedContent />
-      : path === '/wishlist' ? <WishlistContent />
+      : path === '/wishlist' ? <WishlistContent onAddToCart={onAddToCart} />
       : path === '/profile' ? <ProfileContent />
       : <NotConnected icon={content.icon} title={content.title} description={content.description} />}
   </>

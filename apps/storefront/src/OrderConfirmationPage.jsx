@@ -5,23 +5,50 @@ import Footer from './components/Footer'
 import { useApiQuery, describeApiError } from '@mirwal/shared/useApiQuery'
 import api from './api'
 import './order-confirmation.css'
+import OrderTracking from './components/OrderTracking'
+import { RETURN_REASONS, RETURN_STATUS_LABEL } from './returnReasons'
+import OrderAfterSale from './components/OrderAfterSale'
 
 const Icon = ({ name }) => <i className={`fa-solid fa-${name}`} aria-hidden="true" />
 
-const RETURN_REASONS = ['Wrong item received', 'Item damaged or defective', 'Item not as described', 'No longer needed', 'Other']
-const RETURN_STATUS_LABEL = { requested: 'Return requested', approved: 'Return approved', rejected: 'Return rejected' }
 
 function ItemActions({ item, onChanged }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [returnFormOpen, setReturnFormOpen] = useState(false)
-  const [reason, setReason] = useState(RETURN_REASONS[0])
+  const [reason, setReason] = useState(RETURN_REASONS[0][0])
   const [description, setDescription] = useState('')
+  /**
+   * Cancelling asks for confirmation, not a password.
+   *
+   * The API briefly required the account password here. That was removed: cancelling an
+   * unshipped item is the buyer's own right, it is reversible — the stock goes straight back —
+   * and no marketplace asks someone to re-authenticate for it. Re-auth is reserved for actions
+   * where a hijacked session does lasting damage, such as changing the payout destination.
+   *
+   * A confirmation step is still worth having, because the action cannot be undone from this
+   * page: the item is gone from the order and would have to be bought again.
+   */
+  const [confirmingCancel, setConfirmingCancel] = useState(false)
+
+  /**
+   * How many to cancel.
+   *
+   * A buyer who ordered three and wants one fewer used to have to void the line and re-order,
+   * losing their place in the dispatch queue and any coupon that needed the original basket.
+   * The picker only appears when there is more than one, so the ordinary case is unchanged.
+   */
+  const [quantity, setQuantity] = useState(1)
+  const ordered = Number(item.quantity ?? 1)
 
   async function cancel() {
     setBusy(true)
     setError('')
-    try { await api.orders.cancelItem(item.id); onChanged() }
+    try {
+      await api.orders.cancelItem(item.id, ordered > 1 ? { quantity } : {})
+      setConfirmingCancel(false)
+      onChanged()
+    }
     catch (requestError) { setError(describeApiError(requestError)) }
     finally { setBusy(false) }
   }
@@ -43,7 +70,7 @@ function ItemActions({ item, onChanged }) {
     return (
       <form className="order-item-return-form" onSubmit={submitReturn}>
         <select value={reason} onChange={(event) => setReason(event.target.value)}>
-          {RETURN_REASONS.map((option) => <option key={option}>{option}</option>)}
+          {RETURN_REASONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
         <textarea placeholder="Tell us more (optional)" value={description} onChange={(event) => setDescription(event.target.value)} />
         <div>
@@ -57,7 +84,31 @@ function ItemActions({ item, onChanged }) {
 
   return (
     <span className="order-item-actions">
-      {item.canCancel && <button type="button" onClick={cancel} disabled={busy}>{busy ? 'Cancelling…' : 'Cancel Item'}</button>}
+      {item.canCancel && !confirmingCancel && <button type="button" onClick={() => setConfirmingCancel(true)} disabled={busy}>Cancel Item</button>}
+      {item.canCancel && confirmingCancel && (
+        <div className="cancel-confirm" role="group" aria-label="Confirm cancellation">
+          <p>
+            Cancel <b>{item.product.name}</b>? This cannot be undone — you would need to order
+            {ordered > 1 ? ' them' : ' it'} again.
+          </p>
+          {ordered > 1 && (
+            <label className="cancel-confirm-qty">
+              How many of the {ordered}?
+              <select value={quantity} onChange={(event) => setQuantity(Number(event.target.value))} disabled={busy}>
+                {Array.from({ length: ordered }, (_, index) => index + 1).map((value) => (
+                  <option key={value} value={value}>{value === ordered ? `All ${value}` : value}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          <div className="cancel-confirm-actions">
+            <button type="button" className="cancel-confirm-yes" onClick={cancel} disabled={busy}>
+              {busy ? 'Cancelling…' : 'Yes, cancel it'}
+            </button>
+            <button type="button" onClick={() => setConfirmingCancel(false)} disabled={busy}>Keep it</button>
+          </div>
+        </div>
+      )}
       {item.canRequestReturn && <button type="button" onClick={() => setReturnFormOpen(true)}>Request Return</button>}
       {error && <small className="order-item-action-error">{error}</small>}
     </span>
@@ -104,5 +155,5 @@ export default function OrderConfirmationPage({ cartCount }) {
     ? `You'll pay ${order.total.display} in cash when it's delivered. Track its progress from your orders page.`
     : order.paymentStatus === 'paid'
       ? `Payment of ${order.total.display} received. Track its progress from your orders page.`
-      : `Payment of ${order.total.display} hasn't been confirmed yet. If you've just paid, this updates as soon as your bank or wallet confirms it.`}</p><strong>{order.orderNumber}</strong><div className="order-confirmed-summary"><h2>Order summary</h2>{order.items.map((item) => <div key={item.id}><img src={item.image} alt={item.product.name} /><span><b>{item.product.name}</b><small>Sold by {item.seller?.name ?? 'Mirwal'} · Qty {item.quantity} · {item.status}</small><ItemActions item={item} onChanged={refetch} /></span><b>{item.lineTotal.display}</b></div>)}<div><span><b>Subtotal</b></span><b>{order.subtotal.display}</b></div><div><span><b>Shipping</b></span><b>{order.shippingFee.display}</b></div><div><span><b>Total</b></span><b>{order.total.display}</b></div><div><span><b>Shipping to</b><small>{order.shippingAddress.fullName} · {order.shippingAddress.line1}{order.shippingAddress.line2 ? `, ${order.shippingAddress.line2}` : ''}, {order.shippingAddress.city}{order.shippingAddress.region ? `, ${order.shippingAddress.region}` : ''} · {order.shippingAddress.phone}</small></span></div></div><div className="order-confirmed-actions"><a href="/orders">View my orders</a><a href="/explore">Continue shopping</a></div></section></div></main><Footer /></>
+      : `Payment of ${order.total.display} hasn't been confirmed yet. If you've just paid, this updates as soon as your bank or wallet confirms it.`}</p><strong>{order.orderNumber}</strong><div className="order-confirmed-summary"><h2>Order summary</h2>{order.items.map((item) => <div key={item.id}><img src={item.image} alt={item.product.name} /><span><b>{item.product.name}</b><small>Sold by {item.seller?.name ?? 'Mirwal'} · Qty {item.quantity} · {item.status}</small><ItemActions item={item} onChanged={refetch} /></span><b>{item.lineTotal.display}</b></div>)}<div><span><b>Subtotal</b></span><b>{order.subtotal.display}</b></div><div><span><b>Shipping</b></span><b>{order.shippingFee.display}</b></div><div><span><b>Total</b></span><b>{order.total.display}</b></div><div><span><b>Shipping to</b><small>{order.shippingAddress.fullName} · {order.shippingAddress.line1}{order.shippingAddress.line2 ? `, ${order.shippingAddress.line2}` : ''}, {order.shippingAddress.city}{order.shippingAddress.region ? `, ${order.shippingAddress.region}` : ''} · {order.shippingAddress.phone}</small></span></div></div><OrderTracking orderId={order.id} /><OrderAfterSale order={order} /><div className="order-confirmed-actions"><a href="/orders">View my orders</a><a href="/explore">Continue shopping</a></div></section></div></main><Footer /></>
 }

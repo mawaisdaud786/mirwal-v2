@@ -1388,3 +1388,27 @@ a:focus-visible {
 .question-status.error { color: var(--color-danger); background: #fdecea; }
 .question-signin { margin-top: 10px; padding: 9px 18px; border: 0; border-radius: 6px; background: var(--color-primary); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; }
 .question-form button:disabled { opacity: .6; }
+
+/* Report this listing.
+   The endpoint has existed since migration 016 and had no control anywhere in the UI, so no
+   report could ever be filed. Styled quietly on purpose: it must be findable without
+   competing with the buy button. */
+.report-listing-trigger { display:flex; align-items:center; gap:7px; width:100%; padding:9px 0; margin-top:10px; border:0; border-top:1px solid var(--color-border-light); color:var(--color-text-light); background:none; font-size:9px; cursor:pointer; }
+.report-listing-trigger:hover { color:var(--color-danger); }
+.report-listing { padding:14px; margin-top:12px; border:1px solid var(--color-border); border-radius:6px; background:#fff; }
+.report-listing h3 { margin:0 0 6px; font:800 11px var(--font-heading); }
+.report-listing h3 i { margin-right:6px; color:var(--color-danger); }
+.report-listing > p { margin:0 0 12px; color:var(--color-text-secondary); font-size:9px; line-height:1.5; }
+.report-listing label { display:block; margin-bottom:10px; }
+.report-listing label span { display:block; margin-bottom:5px; color:var(--color-text-light); font-size:8px; }
+.report-listing select, .report-listing textarea { width:100%; min-height:30px; padding:6px 9px; border:1px solid var(--color-border); border-radius:4px; outline:0; background:#fff; font:inherit; font-size:9px; }
+.report-listing textarea { height:60px; resize:vertical; }
+.report-listing select:focus, .report-listing textarea:focus { border-color:var(--color-primary); box-shadow:0 0 0 3px var(--color-primary-light); }
+.report-listing-error { margin:0 0 10px; color:var(--color-danger); font-size:9px; }
+.report-listing-actions { display:flex; justify-content:flex-end; gap:8px; }
+.report-listing-actions button { padding:7px 14px; border:1px solid var(--color-border); border-radius:4px; background:#fff; font-size:9px; cursor:pointer; }
+.report-listing-actions button[type="submit"] { border-color:var(--color-danger); color:#fff; background:var(--color-danger); }
+.report-listing-actions button[type="submit"]:disabled { opacity:.55; cursor:not-allowed; }
+.report-listing.sent { display:flex; align-items:center; gap:9px; border-color:var(--color-success); background:#f2fbf5; }
+.report-listing.sent i { color:var(--color-success); }
+.report-listing.sent p { margin:0; color:var(--color-text-secondary); font-size:9px; }

@@ -5,6 +5,8 @@ import { useApiQuery, describeApiError } from '@mirwal/shared/useApiQuery'
 import api from './api'
 import './ai-assistant.css'
 import { navigateTo } from '@mirwal/shared/navigation'
+import OrderTracking from './components/OrderTracking'
+import { RETURN_REASONS } from './returnReasons'
 
 /**
  * Order history. Checkout now creates real orders (see CheckoutPage.jsx / the
@@ -107,14 +109,67 @@ function PendingReviews() {
 
 export function OrdersContent() {
   const { data: orders, error, isLoading, refetch } = useApiQuery((signal) => api.orders.list(signal), [])
+  const [filter, setFilter] = useState('all')
+  const [selectedOrder, setSelectedOrder] = useState(null)
+  const visibleOrders = (orders ?? []).filter((order) => filter === 'all' || rollupStatus(order.items) === filter)
+  const [actionError, setActionError] = useState('')
+  const [busyItem, setBusyItem] = useState(null)
+  const [cancelTarget, setCancelTarget] = useState(null)
+  // The item a return is being filed against, and the reason chosen for it.
+  const [returnTarget, setReturnTarget] = useState(null)
+  const [returnReason, setReturnReason] = useState('damaged')
+  /**
+   * Cancel an item.
+   *
+   * Called with no second argument from the row buttons, which opens the confirmation; the
+   * modal then calls it again to actually cancel. The password parameter this used to carry is
+   * gone — the API no longer accepts one, and re-authenticating to cancel your own unshipped
+   * item is friction with nothing behind it.
+   */
+  async function cancelItem(item, confirmed) {
+    if (!confirmed) { setCancelTarget(item); return }
+    setBusyItem(item.id)
+    setActionError('')
+    try {
+      await api.orders.cancelItem(item.id)
+      await refetch()
+      setSelectedOrder(null)
+      setCancelTarget(null)
+    } catch (error) {
+      setActionError(describeApiError(error))
+    } finally {
+      setBusyItem(null)
+    }
+  }
+  /**
+   * Filing a return from the orders list.
+   *
+   * This used to send "No longer needed" for every return anyone ever filed, whatever their
+   * actual reason — the button asked nothing. The reason decides who pays return carriage and
+   * whether the store's return rate counts against it, so it is now asked for, and the buyer
+   * follows the return on its own page rather than watching a single word beside a line.
+   */
+  async function requestReturn(item, reason) {
+    setBusyItem(item.id)
+    setActionError('')
+    try {
+      await api.orders.requestReturn(item.id, { reason })
+      setReturnTarget(null)
+      await refetch()
+      navigateTo('/my-returns')
+    } catch (error) { setActionError(describeApiError(error)) } finally { setBusyItem(null) }
+  }
 
   return (
     <div className="orders-content">
       <header className="orders-heading">
         <div><h1>My Orders</h1><p>View and manage all your orders in one place.</p></div>
+        <div className="orders-reassurance"><FaIcon name="shield-halved" /><span><b>Shopping with confidence</b><small>Secure payments and easy returns</small></span></div>
       </header>
+      {!isLoading && !error && orders?.length > 0 && <nav className="orders-status-tabs" aria-label="Order filters">{[['all', 'All Orders'], ['pending', 'Pending'], ['processing', 'Processing'], ['shipped', 'Shipped'], ['delivered', 'Delivered'], ['cancelled', 'Cancelled']].map(([key, label]) => <button type="button" className={filter === key ? 'active' : ''} key={key} onClick={() => setFilter(key)}>{label} ({key === 'all' ? orders.length : orders.filter((order) => rollupStatus(order.items) === key).length})</button>)}</nav>}
 
       <PendingReviews />
+      {actionError && <p className="address-error" role="alert">{actionError}</p>}
 
       {isLoading && <section className="orders-panel tracking-empty"><div><FaIcon name="spinner" /></div><h2>Loading your orders…</h2></section>}
 
@@ -136,10 +191,10 @@ export function OrdersContent() {
         </section>
       ) : (
         <section className="orders-panel">
-          {orders.map((order) => {
+          {visibleOrders.map((order) => {
             const status = rollupStatus(order.items)
             return (
-              <div className="order-row" key={order.id}>
+              <div className={`order-row${selectedOrder?.id === order.id ? ' is-selected' : ''}`} key={order.id} onClick={() => setSelectedOrder(order)}>
                 <div className="order-id"><b>{order.orderNumber}</b><span>{new Date(order.createdAt.replace(' ', 'T') + 'Z').toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}</span></div>
                 <div className="order-items">
                   {order.items.slice(0, 3).map((item) => <img key={item.id} src={item.image} alt={item.product.name} />)}
@@ -148,12 +203,25 @@ export function OrdersContent() {
                 <div className="order-summary"><b>{order.items[0].product.name}</b><small>{order.items.length > 1 ? `+${order.items.length - 1} more item${order.items.length > 2 ? 's' : ''}` : 'Qty: ' + order.items[0].quantity}</small></div>
                 <div className="order-total"><b>{order.total.display}</b><small>{order.paymentMethod === 'cod' ? 'Cash on Delivery' : order.paymentMethod}</small></div>
                 <div className="order-status"><em className={status}>{STATUS_LABEL[status]}</em></div>
-                <div className="order-actions"><button type="button" onClick={() => navigateTo(`/order-success/${order.id}`)}>View Details</button></div>
+                <div className="order-actions">{order.items.some((item) => item.canCancel) && <button type="button" onClick={() => setCancelTarget(order.items.find((item) => item.canCancel))} disabled={!!busyItem}>Cancel</button>}{order.items.some((item) => item.canRequestReturn) && <button type="button" onClick={() => setReturnTarget(order.items.find((item) => item.canRequestReturn))} disabled={!!busyItem}>Return &amp; Refund</button>}<button type="button" onClick={() => navigateTo(`/order-success/${order.id}`)}>View Details</button></div>
               </div>
             )
           })}
         </section>
       ))}
+      {selectedOrder && <aside className="order-details-drawer"><button className="order-drawer-close" type="button" aria-label="Close order details" onClick={() => setSelectedOrder(null)}><FaIcon name="xmark" /></button><h2>Order {selectedOrder.orderNumber}</h2><small>Placed {new Date(selectedOrder.createdAt.replace(' ', 'T') + 'Z').toLocaleString('en-PK')}</small><div className="order-drawer-items">{selectedOrder.items.map((item) => <div key={item.id}><img src={item.image} alt={item.product.name} /><span><b>{item.product.name}</b><small>{item.quantity} × {item.price?.display ?? ''}</small><em>{item.canCancel ? 'Cancellation available' : item.canRequestReturn ? 'Return eligible' : item.status}</em></span>{item.canCancel && <button type="button" onClick={() => cancelItem(item)}>Cancel</button>}{item.canRequestReturn && <button type="button" onClick={() => setReturnTarget(item)}>Return</button>}</div>)}</div>{/* Was five hard-coded steps with "done" inferred from the order's rollup status — so
+    "Packed" and "Out for Delivery" were never reached whatever actually happened, and the
+    whole strip was decoration. Real shipment data replaces it, and renders nothing at all
+    when there is no shipment yet rather than showing an empty promise. */}
+<OrderTracking orderId={selectedOrder.id} /><div className="order-drawer-actions"><button type="button" onClick={() => navigateTo('/track-orders')}><FaIcon name="truck" /> Track Package</button><button type="button" onClick={() => navigateTo('/help-center')}><FaIcon name="headset" /> Contact Support</button><button type="button" onClick={() => navigateTo(`/order-success/${selectedOrder.id}`)}><FaIcon name="file-invoice" /> View Invoice</button></div><section className="order-drawer-info"><h3><FaIcon name="location-dot" /> Shipping Information</h3><p>{selectedOrder.shippingAddress?.fullName}<br />{selectedOrder.shippingAddress?.line1}<br />{selectedOrder.shippingAddress?.city}{selectedOrder.shippingAddress?.region ? `, ${selectedOrder.shippingAddress.region}` : ''}</p><h3><FaIcon name="credit-card" /> Payment Information <strong>{selectedOrder.total.display}</strong></h3><p>{selectedOrder.paymentMethod === 'cod' ? 'Cash on Delivery' : selectedOrder.paymentMethod}</p></section></aside>}
+      {/* No password here.
+    Cancelling an unshipped item is the buyer's own right, it is reversible — the stock goes
+    straight back — and the API stopped accepting a password for it. Re-authentication is
+    reserved for actions where a hijacked session does lasting damage, such as changing a
+    payout destination. Confirmation is still warranted: this cannot be undone from here. */}
+{returnTarget && <div className="cancel-modal-backdrop"><form className="cancel-modal" onSubmit={(event) => { event.preventDefault(); requestReturn(returnTarget, returnReason) }}><button type="button" className="order-drawer-close" onClick={() => setReturnTarget(null)}><FaIcon name="xmark" /></button><div className="cancel-modal-icon"><FaIcon name="rotate-left" /></div><h2>Return this item?</h2><p>Why are you returning <b>{returnTarget.product?.name}</b>?</p>{/* The reason decides who pays return postage — a fault is the seller's, a change of mind is yours — so it is asked rather than assumed. */}<select value={returnReason} onChange={(event) => setReturnReason(event.target.value)} aria-label="Reason for return">{RETURN_REASONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><div><button type="button" onClick={() => setReturnTarget(null)}>Never mind</button><button type="submit" disabled={!!busyItem}>{busyItem ? 'Filing…' : 'File the return'}</button></div>{actionError && <small>{actionError}</small>}</form></div>}
+
+{cancelTarget && <div className="cancel-modal-backdrop"><form className="cancel-modal" onSubmit={(event) => { event.preventDefault(); cancelItem(cancelTarget, true) }}><button type="button" className="order-drawer-close" onClick={() => setCancelTarget(null)}><FaIcon name="xmark" /></button><div className="cancel-modal-icon"><FaIcon name="triangle-exclamation" /></div><h2>Cancel this item?</h2><p>Cancel <b>{cancelTarget.product?.name}</b>? This cannot be undone &mdash; you would need to order it again.</p><div><button type="button" onClick={() => setCancelTarget(null)}>Keep it</button><button type="submit" disabled={!!busyItem}>{busyItem ? 'Cancelling…' : 'Yes, cancel it'}</button></div>{actionError && <small>{actionError}</small>}</form></div>}
     </div>
   )
 }

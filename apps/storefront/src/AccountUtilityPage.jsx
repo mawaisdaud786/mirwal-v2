@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import Header from './components/Header'
 import { useComparison } from './components/useComparison'
 import { useSession } from './components/useSession'
+import { VerificationPanel } from '@mirwal/shared/VerificationPanel'
 import { useApiQuery, describeApiError } from '@mirwal/shared/useApiQuery'
 import api from './api'
 import './ai-assistant.css'
@@ -45,7 +46,7 @@ import { navigateTo } from '@mirwal/shared/navigation'
  * otherwise. It now calls the real `api.auth.logout()` first.
  */
 
-const FaIcon = ({ name }) => <i className={`fa-solid fa-${name}`} aria-hidden="true" />
+const FaIcon = ({ name, className = '' }) => <i className={`fa-solid fa-${name} ${className}`.trim()} aria-hidden="true" />
 const configs = {
   '/track-orders': ['truck', 'Track Your Order', 'Enter your order ID or tracking number to see the latest delivery status.'],
   '/compare': ['scale-balanced', 'Compare Products', 'Compare products side by side and choose with confidence.'],
@@ -60,8 +61,21 @@ function navigate(path) { navigateTo(path) }
 
 export function AccountSidebar({ active }) {
   const { products: compared } = useComparison()
-  const links = [['user', 'Profile', '/profile'], ['box', 'Orders', '/orders'], ['truck', 'Track Orders', '/track-orders'], ['heart', 'Wishlist', '/wishlist'], ['scale-balanced', 'Compare', '/compare'], ['location-dot', 'Addresses', '/addresses'], ['credit-card', 'Payment Methods', '/payment-methods'], ['bell', 'Notifications', '/notifications'], ['shield-halved', 'Security', '/security']]
-  return <aside className="profile-sidebar"><b className="profile-sidebar-title">MY ACCOUNT</b>{links.map(([icon, label, path]) => <button className={label === active ? 'active' : ''} type="button" key={label} onClick={() => navigate(path)}><FaIcon name={icon} /> {label}{label === 'Compare' && compared.length > 0 && <i className="profile-count">{compared.length}</i>}</button>)}<button className="profile-logout" type="button" onClick={() => navigate('/logout')}><FaIcon name="right-from-bracket" /> Logout</button></aside>
+  const links = [
+    ['user', 'Profile', '/profile', 'profile'],
+    ['box', 'Orders', '/orders', 'orders'],
+    // Sits next to Orders because that is where a buyer goes looking for it. Before this
+    // there was nowhere to see a return once it had been filed.
+    ['rotate-left', 'Returns', '/my-returns', 'orders'],
+    ['truck', 'Track Orders', '/track-orders', 'track'],
+    ['heart', 'Wishlist', '/wishlist', 'wishlist'],
+    ['clock-rotate-left', 'Compare History', '/compare-history', 'compare'],
+    ['location-dot', 'Addresses', '/addresses', 'addresses'],
+    ['credit-card', 'Payment Methods', '/payment-methods', 'payments'],
+    ['bell', 'Notifications', '/notifications', 'notifications'],
+    ['shield-halved', 'Security', '/security', 'security'],
+  ]
+  return <aside className="profile-sidebar"><b className="profile-sidebar-title">MY ACCOUNT</b>{links.map(([icon, label, path, tone]) => <button className={label === active ? 'active' : ''} type="button" key={label} data-tone={tone} onClick={() => navigate(path)}><FaIcon name={icon} className="profile-sidebar-icon" /> {label}{label === 'Compare' && compared.length > 0 && <i className="profile-count">{compared.length}</i>}</button>)}<button className="profile-logout" type="button" onClick={() => navigate('/logout')}><FaIcon name="right-from-bracket" className="profile-sidebar-icon" /> Logout</button></aside>
 }
 
 function NotConnected({ icon, title, description }) {
@@ -161,7 +175,7 @@ function Compare() {
     return <NotConnected icon="scale-balanced" title="Nothing to compare yet" description="Use Compare on any product to add it here — you can compare up to 4 at once." />
   }
   return <section className="utility-card compare-utility">
-    <div className="utility-card-heading"><h2>Compare Products ({compared.length})</h2><button type="button" onClick={clearProducts}>Clear All</button></div>
+    <div className="compare-heading"><div><h2><FaIcon name="scale-balanced" /> Compare Products</h2><p>Compare your selected products side by side.</p></div><button type="button" onClick={clearProducts}><FaIcon name="trash-can" /> Clear All</button></div>
     <div className="compare-products">
       {compared.map((product) => (
         <article key={product.id}>
@@ -170,6 +184,7 @@ function Compare() {
           <b>{product.name}</b>
           <strong>{product.price?.display}</strong>
           {product.availability && <em>{product.availability.inStock ? 'In Stock' : 'Out of stock'}</em>}
+          <small><FaIcon name="circle-check" /> {product.rating?.count ? `${product.rating.average.toFixed(1)} rating` : 'No ratings yet'}</small>
         </article>
       ))}
     </div>
@@ -180,7 +195,14 @@ function Compare() {
   </section>
 }
 
+function CompareHistory() {
+  const { history, clearHistory, loadProducts } = useComparison()
+  return <section className="compare-history-page"><div className="compare-history-hero"><h1><span>⚖</span> Compare <em>History</em></h1><p>Review your recent product comparisons and continue where you left off.</p></div><div className="compare-history-heading"><h2>Compare History</h2><button type="button" onClick={clearHistory} disabled={!history.length}>Clear All History</button></div>{history.length ? history.map((entry) => <article className="compare-history-row" key={entry.id}><div><small>{new Date(entry.createdAt).toLocaleString()}</small><h3>{entry.products.length} products compared</h3></div><div className="compare-history-products">{entry.products.map((product) => <img key={product.id} src={product.images?.[0]?.url} alt={product.name} />)}</div><button type="button" onClick={() => { loadProducts(entry.products); navigate('/compare') }}>View Comparison <FaIcon name="arrow-right" /></button></article>) : <div className="compare-history-empty"><FaIcon name="scale-balanced" /><h3>No comparison history yet</h3><p>Add products to the general compare page and your comparison snapshots will appear here.</p><button type="button" onClick={() => navigate('/explore')}>Start Comparing</button></div>}</section>
+}
+
 const EMPTY_ADDRESS = { fullName: '', phone: '', line1: '', line2: '', city: '', region: '', postalCode: '', isDefault: false }
+
+function normalizeAddress(value) { return String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]/g, '') }
 
 function AddressForm({ initial, onCancel, onSave, saving }) {
   const [form, setForm] = useState(initial ?? EMPTY_ADDRESS)
@@ -218,10 +240,15 @@ function Addresses() {
     setSaving(true)
     setActionError('')
     try {
-      if (mode === 'add') await api.addresses.create(form)
+      const duplicate = addresses.some((address) => address.id !== mode && ['fullName', 'phone', 'line1', 'line2', 'city', 'region', 'postalCode'].every((field) => normalizeAddress(address[field]) === normalizeAddress(form[field])))
+      if (duplicate) {
+        setActionError('This address is already saved.')
+        return
+      }
+      if (mode === 'add' || mode === null) await api.addresses.create(form)
       else await api.addresses.update(mode, form)
+      await refetch()
       setMode(null)
-      refetch()
     } catch (requestError) {
       setActionError(describeApiError(requestError))
     } finally {
@@ -231,50 +258,38 @@ function Addresses() {
 
   async function handleDelete(id) {
     setActionError('')
-    try { await api.addresses.remove(id); refetch() }
+    try { await api.addresses.remove(id); await refetch() }
     catch (requestError) { setActionError(describeApiError(requestError)) }
   }
 
   async function handleSetDefault(address) {
     setActionError('')
-    try { await api.addresses.update(address.id, { ...address, isDefault: true }); refetch() }
+    try { await api.addresses.update(address.id, { ...address, isDefault: true }); await refetch() }
     catch (requestError) { setActionError(describeApiError(requestError)) }
   }
 
   if (isLoading) return <section className="utility-card address-utility"><p>Loading your addresses…</p></section>
   if (error) return <NotConnected icon="triangle-exclamation" title="Couldn't load your addresses" description={describeApiError(error)} />
 
-  if (mode === 'add' || addresses.some((address) => address.id === mode)) {
-    const editing = addresses.find((address) => address.id === mode)
-    return (
-      <section className="utility-card address-utility">
-        <div className="utility-card-heading"><h2>{editing ? 'Edit Address' : 'Add New Address'}</h2></div>
-        <AddressForm initial={editing} onCancel={() => setMode(null)} onSave={handleSave} saving={saving} />
-      </section>
-    )
-  }
-
+  const editing = addresses.find((address) => address.id === mode)
   return (
-    <section className="utility-card address-utility">
-      <div className="utility-card-heading"><h2>Saved Addresses</h2><button type="button" onClick={() => setMode('add')}>Add New Address</button></div>
-      {actionError && <p className="address-error" role="alert">{actionError}</p>}
-      {addresses.length === 0 ? (
-        <p>You haven't saved any addresses yet.</p>
-      ) : addresses.map((address) => (
-        <div className="address-item" key={address.id}>
-          <div>
-            {address.isDefault && <b>DEFAULT</b>}
-            <strong>{address.fullName}</strong>
-            <small>{address.line1}{address.line2 ? `, ${address.line2}` : ''}, {address.city}{address.region ? `, ${address.region}` : ''} · {address.phone}</small>
+    <div className="address-dashboard">
+      <section className="utility-card address-utility address-saved-panel">
+        <div className="utility-card-heading"><h2><FaIcon name="location-dot" /> Saved Addresses ({addresses.length})</h2><button type="button" onClick={() => setMode('add')}><FaIcon name="plus" /> Add New Address</button></div>
+        {actionError && <p className="address-error" role="alert">{actionError}</p>}
+        {addresses.length === 0 ? <p>You haven't saved any addresses yet.</p> : addresses.map((address) => (
+          <div className={`address-item${address.isDefault ? ' is-default' : ''}`} key={address.id}>
+            <div className="address-item-icon"><FaIcon name={address.isDefault ? 'house' : 'briefcase'} /></div>
+            <div className="address-item-copy">{address.isDefault && <b>DEFAULT</b>}<strong>{address.fullName}</strong><small>{address.line1}{address.line2 ? `, ${address.line2}` : ''}, {address.city}{address.region ? `, ${address.region}` : ''}</small><small><FaIcon name="phone" /> {address.phone}</small></div>
+            <span className="address-item-actions">{!address.isDefault && <button type="button" onClick={() => handleSetDefault(address)}>Set Default</button>}<button type="button" onClick={() => setMode(address.id)}>Edit</button><button type="button" onClick={() => handleDelete(address.id)}>Delete</button></span>
           </div>
-          <span>
-            {!address.isDefault && <button type="button" onClick={() => handleSetDefault(address)}>Set Default</button>}
-            <button type="button" onClick={() => setMode(address.id)}>Edit</button>
-            <button type="button" onClick={() => handleDelete(address.id)}>Delete</button>
-          </span>
-        </div>
-      ))}
-    </section>
+        ))}
+      </section>
+      <section className="utility-card address-utility address-form-panel">
+        <div className="utility-card-heading"><h2><FaIcon name="plus" /> {editing ? 'Edit Address' : 'Add New Address'}</h2><p>Fill in the details to save a new address.</p></div>
+        <AddressForm key={`${mode || 'add'}-${addresses.length}`} initial={editing} onCancel={() => setMode(null)} onSave={handleSave} saving={saving} />
+      </section>
+    </div>
   )
 }
 
@@ -292,31 +307,22 @@ const PAYMENT_ICON = { cod: 'money-bill-wave', card: 'credit-card', easypaisa: '
 
 function Payments() {
   const { data: methods, error, isLoading } = useApiQuery((signal) => api.payments.methods(signal), [])
+  const { user, refresh } = useSession()
+  const [savingDefault, setSavingDefault] = useState(false)
 
   if (isLoading) return <section className="utility-card"><p>Loading payment options…</p></section>
   if (error) return <NotConnected icon="triangle-exclamation" title="Couldn't load payment options" description={describeApiError(error)} />
 
-  return (
-    <section className="utility-card payment-utility">
-      <div className="utility-card-heading"><h2>How you can pay</h2></div>
-      <p className="payment-intro">
-        Mirwal does not store your card. Payments are handled by the provider at checkout, and nothing
-        card-shaped is ever kept on your account — which is why there is no wallet to manage here.
-      </p>
-      {methods.map((method) => (
-        <article className={`payment-method ${method.available ? '' : 'unavailable'}`} key={method.method}>
-          <span><FaIcon name={PAYMENT_ICON[method.method] ?? 'credit-card'} /></span>
-          <div>
-            <b>{method.label}</b>
-            <small>{method.description}</small>
-          </div>
-          {/* Availability is the server's own view of which provider credentials are present,
-              so an unconfigured gateway is never shown as though it worked. */}
-          <em className={method.available ? 'on' : 'off'}>{method.available ? 'Available' : 'Not offered'}</em>
-        </article>
-      ))}
-    </section>
-  )
+  const available = methods.filter((method) => method.available)
+  async function setDefault(method) {
+    setSavingDefault(true)
+    try { await api.auth.updateMe({ fullName: user.fullName, phone: user.phone ?? '', paymentMethod: method }); await refresh?.() }
+    finally { setSavingDefault(false) }
+  }
+  return <>
+    <section className="payment-hero"><div><h1>Secure &amp; Flexible <em>Payments</em></h1><p>Choose your preferred payment method and enjoy<br />a hassle-free shopping experience.</p><div className="payment-benefits"><span><b><FaIcon name="shield-halved" /></b>100% Secure<br />Transactions</span><span><b><FaIcon name="bolt" /></b>Multiple<br />Payment Options</span><span><b><FaIcon name="lock" /></b>Your Payment<br />Information is Safe</span></div></div><div className="payment-hero-art"><FaIcon name="credit-card" /><FaIcon name="mobile-screen" /><FaIcon name="shield-halved" /></div></section>
+    <div className="payment-dashboard"><section className="utility-card payment-utility"><div className="utility-card-heading"><h2><FaIcon name="credit-card" /> Your Payment Methods</h2><p>Manage your available payment methods for faster checkout.</p></div>{available.map((method) => <article className="payment-method" key={method.method}><span><FaIcon name={PAYMENT_ICON[method.method] ?? 'credit-card'} /></span><div><b>{method.label}</b><small>{method.description}</small><em className="on">{user?.paymentMethod === method.method ? 'Default' : 'Available at checkout'}</em></div><button type="button" disabled={savingDefault || user?.paymentMethod === method.method} onClick={() => setDefault(method.method)}>Set as Default</button></article>)}</section><section className="utility-card payment-add-panel"><div className="utility-card-heading"><h2><FaIcon name="plus" /> Add New Payment Method</h2><p>Choose a payment method to use at checkout.</p></div><div className="payment-choice-grid">{methods.map((method) => <div className={method.available ? 'is-available' : 'is-disabled'} key={method.method}><FaIcon name={PAYMENT_ICON[method.method] ?? 'credit-card'} />{method.label}</div>)}</div><p className="payment-security-note"><FaIcon name="lock" /> Card details are entered securely through the payment provider. Mirwal never stores full card numbers.</p></section></div>
+  </>
 }
 
 const NOTIFICATION_ICON = {
@@ -327,21 +333,47 @@ const NOTIFICATION_ICON = {
   item_cancelled: 'circle-xmark',
 }
 
+const CHANNEL_ICON = { inApp: 'bell', email: 'envelope', sms: 'mobile-screen' }
+const CATEGORY_ICON = {
+  orders: 'truck', returns: 'rotate-left', account: 'user',
+  security: 'shield-halved', marketing: 'tag',
+}
+
 function Notifications() {
   const { data: notifications, error, isLoading, refetch } = useApiQuery((signal) => api.notifications.list(signal), [])
   const [actionError, setActionError] = useState('')
+  const [selectedNotification, setSelectedNotification] = useState(null)
+  /**
+   * Preferences come from the server, and so does the list of them.
+   *
+   * They used to be read out of `localStorage` and written to two opaque JSON blobs on the
+   * profile PATCH, with the browser inventing their shape — which is how this panel ended up
+   * offering five toggles taken from an icon lookup table, none of which anything read. The
+   * server now owns the categories, says which are compulsory, and honours the rest.
+   */
+  const prefs = useApiQuery((signal) => api.notifications.preferences(signal), [])
+  const [saving, setSaving] = useState(null)
+
+  const savePreference = async (kind, key, enabled) => {
+    setSaving(key)
+    setActionError('')
+    try {
+      await api.notifications.setPreferences({ [kind]: { [key]: enabled } })
+      await prefs.refetch()
+    } catch (error) { setActionError(describeApiError(error)) } finally { setSaving(null) }
+  }
 
   async function openNotification(notification) {
     if (!notification.read) {
-      try { await api.notifications.markRead(notification.id); refetch() }
+      try { await api.notifications.markRead(notification.id); await refetch() }
       catch (requestError) { setActionError(describeApiError(requestError)) }
     }
-    if (notification.link) navigate(notification.link)
+    setSelectedNotification(notification)
   }
 
   async function markAllRead() {
     setActionError('')
-    try { await api.notifications.markAllRead(); refetch() }
+    try { await api.notifications.markAllRead(); await refetch() }
     catch (requestError) { setActionError(describeApiError(requestError)) }
   }
 
@@ -350,31 +382,53 @@ function Notifications() {
 
   const unreadCount = notifications.filter((notification) => !notification.read).length
 
-  return (
-    <section className="utility-card notification-utility">
-      <div className="utility-card-heading">
-        <h2>Notifications</h2>
-        {unreadCount > 0 && <button type="button" onClick={markAllRead}>Mark all as read</button>}
-      </div>
-      {actionError && <p className="address-error" role="alert">{actionError}</p>}
-      {notifications.length === 0 ? (
-        <p>You don't have any notifications yet. Order and account updates will show up here.</p>
-      ) : notifications.map((notification) => (
-        <article
-          key={notification.id}
-          style={{ opacity: notification.read ? 0.65 : 1, cursor: notification.link ? 'pointer' : 'default' }}
-          onClick={() => openNotification(notification)}
-        >
-          <span><FaIcon name={NOTIFICATION_ICON[notification.type] ?? 'bell'} /></span>
+  return <section className="notification-dashboard">
+    <div className="notification-hero"><div><h1><em>Notifications</em></h1><p>Stay updated with everything that matters.<br />Get real-time updates about your orders, deals, price drops and more.</p></div><div className="notification-hero-icon"><FaIcon name="bell" /></div></div>
+    <div className="notification-columns">
+      <section className="utility-card notification-utility"><div className="utility-card-heading"><h2><FaIcon name="bell" /> Recent Notifications <small>({notifications.length})</small></h2><button type="button" onClick={markAllRead} disabled={!unreadCount}>Mark all as read</button></div>{actionError && <p className="address-error" role="alert">{actionError}</p>}{notifications.length === 0 ? <p>You don't have any notifications yet. Order and account updates will show up here.</p> : notifications.map((notification) => <article className={`notification-item ${notification.read ? 'is-read' : 'is-unread'}`} key={notification.id} onClick={() => openNotification(notification)}><span><FaIcon name={NOTIFICATION_ICON[notification.type] ?? 'bell'} /></span><div><b>{notification.title}</b><p>{notification.body}</p></div><small>{new Date(notification.createdAt.replace(' ', 'T') + 'Z').toLocaleDateString('en-PK', { day: 'numeric', month: 'short' })}</small></article>)}</section>
+      <aside className="notification-side">
+        <section className="notification-side-card">
+          <h2><FaIcon name="sliders" /> How we reach you</h2>
+          <p>Turn a channel off and nothing in it is sent — except security alerts.</p>
           <div>
-            <b>{notification.title}</b>
-            <p>{notification.body}</p>
+            {(prefs.data?.channels ?? []).map((channel) => (
+              <button
+                className="notification-channel"
+                type="button"
+                key={channel.key}
+                disabled={channel.forced || saving === channel.key}
+                onClick={() => savePreference('channels', channel.key, !channel.enabled)}
+              >
+                <FaIcon name={CHANNEL_ICON[channel.key] ?? 'bell'} />
+                <b>{channel.label}{channel.forced && <small>Always on &mdash; this is your record of what happened.</small>}</b>
+                <i>{channel.enabled ? 'On' : 'Off'}</i>
+              </button>
+            ))}
           </div>
-          <small>{new Date(notification.createdAt.replace(' ', 'T') + 'Z').toLocaleDateString('en-PK', { day: 'numeric', month: 'short' })}</small>
-        </article>
-      ))}
-    </section>
-  )
+        </section>
+        <section className="notification-side-card">
+          <h2><FaIcon name="gear" /> What we tell you about</h2>
+          <p>Choose what you hear from Mirwal about.</p>
+          {(prefs.data?.categories ?? []).map((category) => (
+            <button
+              className="notification-preference"
+              type="button"
+              key={category.key}
+              disabled={category.forced || saving === category.key}
+              onClick={() => savePreference('categories', category.key, !category.enabled)}
+            >
+              <FaIcon name={CATEGORY_ICON[category.key] ?? 'bell'} />
+              {/* Security says why it cannot be turned off rather than simply refusing: an
+                  alert about a sign-in you did not make is no use to the person who did. */}
+              <b>{category.label}<small>{category.forced ? 'Always on — these warn you about things you did not do.' : category.description}</small></b>
+              <i>{category.enabled ? 'On' : 'Off'}</i>
+            </button>
+          ))}
+        </section>
+      </aside>
+    </div>
+    {selectedNotification && <div className="notification-modal-backdrop" role="presentation" onClick={() => setSelectedNotification(null)}><section className="notification-modal" role="dialog" aria-modal="true" aria-labelledby="notification-modal-title" onClick={(event) => event.stopPropagation()}><button className="notification-modal-close" type="button" aria-label="Close notification" onClick={() => setSelectedNotification(null)}><FaIcon name="xmark" /></button><div className="notification-modal-icon"><FaIcon name={NOTIFICATION_ICON[selectedNotification.type] ?? 'bell'} /></div><small>{new Date(selectedNotification.createdAt.replace(' ', 'T') + 'Z').toLocaleString('en-PK')}</small><h2 id="notification-modal-title">{selectedNotification.title}</h2><p>{selectedNotification.body}</p>{selectedNotification.link && <button type="button" onClick={() => navigate(selectedNotification.link)}>View details <FaIcon name="arrow-right" /></button>}</section></div>}
+  </section>
 }
 
 /**
@@ -389,6 +443,54 @@ function Notifications() {
  * did something narrower than the words on it would be worse than not having it. Support
  * handles it, and this says so.
  */
+/**
+ * The enrolment key, in the two forms people actually use.
+ *
+ * The API has returned an `otpauthUri` alongside the raw secret since migration 018 and both
+ * panels ignored it, showing only a 32-character base32 string to be typed by hand into a
+ * phone. That is the step where enrolment goes wrong: one mistyped character produces codes
+ * that never match, and the failure looks like a broken feature rather than a typo.
+ *
+ * On a phone the `otpauth://` link opens the authenticator directly. On a desktop the secret
+ * is grouped in fours, which is how every authenticator app formats it for manual entry, with
+ * a copy button so it need not be transcribed at all.
+ *
+ * A QR code would be better still and needs a rendering library; this is the useful part of
+ * that improvement with no new dependency.
+ */
+function TwoFactorKey({ enrolment }) {
+  const [copied, setCopied] = useState(false)
+  const grouped = String(enrolment.secret).replace(/(.{4})/g, '$1 ').trim()
+
+  return (
+    <div className="security-key">
+      {enrolment.otpauthUri && (
+        <a className="security-key-link" href={enrolment.otpauthUri}>
+          <FaIcon name="mobile-screen" /> Open in my authenticator app
+        </a>
+      )}
+      <p className="security-key-or">or enter the key by hand</p>
+      <code className="security-secret">{grouped}</code>
+      <button
+        type="button"
+        className="security-key-copy"
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(enrolment.secret)
+            setCopied(true)
+            window.setTimeout(() => setCopied(false), 2000)
+          } catch {
+            // Clipboard access is refused in some browsers and over plain http. The key is
+            // on screen either way, so this is a convenience failing, not the flow failing.
+          }
+        }}
+      >
+        <FaIcon name={copied ? 'check' : 'copy'} /> {copied ? 'Copied' : 'Copy key'}
+      </button>
+    </div>
+  )
+}
+
 function Security() {
   const { user } = useSession()
   const [busy, setBusy] = useState(false)
@@ -444,6 +546,23 @@ function Security() {
           <button type="button" onClick={() => setCodes(null)}>I have saved these</button>
         </div>
       )}
+
+      {/*
+        --- Contact details ---
+
+        Placed first on purpose. Confirming that the email and phone on the account actually
+        reach this person is what makes everything below it useful: a password reset, a 2FA
+        recovery, and every security alert Mirwal sends all depend on it. It is also the gate
+        on applying to sell.
+      */}
+      <div className="security-block">
+        <div className="security-block-head">
+          <span><FaIcon name="address-card" /></span>
+          <b>Your contact details</b>
+        </div>
+        <p>Confirming these lets us reach you about orders, reset your password, and recover your account if you lose your phone.</p>
+        <VerificationPanel api={api.verification} phoneHint="Add a mobile number on your Profile page, then come back here to confirm it." />
+      </div>
 
       {/* --- Password --- */}
       <div className="security-block">
@@ -510,7 +629,7 @@ function Security() {
         ) : enrolment ? (
           <div className="security-enrol">
             <p>Add this key to your authenticator app, then enter the code it shows.</p>
-            <code className="security-secret">{enrolment.secret}</code>
+            <TwoFactorKey enrolment={enrolment} />
             <form
               onSubmit={async (event) => {
                 event.preventDefault()
@@ -599,14 +718,14 @@ function Logout() {
     await logout()
     navigate('/login')
   }
-  return <section className="utility-card logout-utility">
+  return <div className="logout-overlay"><section className="logout-modal" role="dialog" aria-modal="true" aria-labelledby="logout-title">
     <div><FaIcon name="lock" /></div>
-    <h2>Are you sure you want to logout?</h2>
+    <h2 id="logout-title">Sign out of Mirwal?</h2>
     <p>You will be logged out of your account on this device.</p>
     <button type="button" onClick={submit}>Logout</button>
     <button type="button" onClick={() => navigate('/profile')}>Cancel</button>
-  </section>
+  </section></div>
 }
 
-export function AccountUtilityContent({ path }) { const config = configs[path] || configs['/track-orders']; return <div className="utility-content"><section className="utility-heading"><span><FaIcon name={config[0]} /></span><div><h1>{config[1]}</h1><p>{config[2]}</p></div></section>{path === '/track-orders' && <TrackOrders />}{path === '/compare' && <Compare />}{path === '/addresses' && <Addresses />}{path === '/payment-methods' && <Payments />}{path === '/notifications' && <Notifications />}{path === '/security' && <Security />}{path === '/logout' && <Logout />}</div> }
+export function AccountUtilityContent({ path }) { if (path === '/logout') return <Logout />; if (path === '/compare-history') return <CompareHistory />; const config = configs[path] || configs['/track-orders']; return <div className={`utility-content${path === '/addresses' ? ' addresses-content' : ''}${path === '/security' ? ' security-content' : ''}`}>{path === '/addresses' ? <section className="address-hero"><div><h1>Your <em>Addresses</em></h1><p>Save your addresses for faster checkout<br />and a smoother shopping experience.</p><div className="address-benefits"><span><b><FaIcon name="bolt" /></b>Faster<br />Checkout</span><span><b><FaIcon name="location-dot" /></b>Multiple<br />Addresses</span><span><b><FaIcon name="shield-halved" /></b>Secure<br />&amp; Private</span><span><b><FaIcon name="house" /></b>Deliver to<br />All Over Pakistan</span></div></div><div className="address-hero-art"><FaIcon name="location-dot" /><span>Delivering<br />Happiness<br />Across Pakistan</span></div></section> : path === '/security' ? <section className="security-hero"><div><h1>Security <em>Settings</em></h1><p>Keep your Mirwal account protected.</p><div className="security-benefits"><span><b><FaIcon name="shield-halved" /></b>Secure<br />Account</span><span><b><FaIcon name="lock" /></b>Your Data<br />Our Priority</span><span><b><FaIcon name="users" /></b>Safe<br />Shopping</span><span><b><FaIcon name="circle-check" /></b>Always<br />Protected</span></div></div><div className="security-hero-art"><FaIcon name="shield-halved" /><FaIcon name="lock" /></div></section> : <section className="utility-heading"><span><FaIcon name={config[0]} /></span><div><h1>{config[1]}</h1><p>{config[2]}</p></div></section>}{path === '/track-orders' && <TrackOrders />}{path === '/compare' && <Compare />}{path === '/addresses' && <Addresses />}{path === '/payment-methods' && <Payments />}{path === '/notifications' && <Notifications />}{path === '/security' && <Security />}</div> }
 export default function AccountUtilityPage({ path, cartCount }) { const config = configs[path] || configs['/track-orders']; const active = config[1].replace('Your ', '').replace('My ', ''); return <div className="assistant-page"><Header cartCount={cartCount} /><main className="account-utility-page container"><div className="profile-breadcrumb"><button type="button" onClick={() => navigate('/')}>Home</button><FaIcon name="chevron-right" /><button type="button" onClick={() => navigate('/profile')}>My Account</button><FaIcon name="chevron-right" /><b>{config[1]}</b></div><div className="profile-layout"><AccountSidebar active={active} /><AccountUtilityContent path={path} /></div></main></div> }
